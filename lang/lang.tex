@@ -9,11 +9,12 @@
 \subsection{AST}
 
 \[ e := x \mid v \mid \textsf{f\_un}(e) \mid \textsf{f\_bin}(e, e) \mid \textsf{let } x = e \textsf{ in } e \]
+\[ \tau := \textsf{public} \mid \textsf{secret} \]
 
 
 \subsection{Typing Rules}
 
-\centering
+\begin{center}
 \begin{tabular}{cc}
 $\infer[(\textsc{T-Var})]{
     \Gamma \vdash x : \tau
@@ -25,9 +26,9 @@ $\infer[(\textsc{T-Val})]{
     \vdash v : \textsf{public}
 }{}$
 \end{tabular} \\
+\end{center}
 
-\vspace{0.5cm}
-\centering
+\begin{center}
 \begin{tabular}{cc}
 $\infer[(\textsc{T-UnFun})]{ \Gamma \vdash \textsf{f\_un}(e) : \tau }{ \Gamma \vdash e : \tau }$ &
 
@@ -38,22 +39,24 @@ $\infer[(\textsc{T-BinFun})]{
     & \Gamma \vdash e_2 : \tau_2
 }$
 \end{tabular} \\
+\end{center}
 
-\vspace{0.5cm}
-\centering
+\begin{center}
 $\infer[(\textsc{T-Let})]{
-    \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \textsf{max}(\tau_1, \tau_2) 
+    \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2
 }{
     \Gamma \vdash e_1 : \tau_1
     & \Gamma, x : \tau_1 \vdash e_2 : \tau_2
 }$
+\end{center}
 
-\vspace{0.5cm}
-\centering
-\begin{tabular}{cc}
-$\infer[(\textsc{T-MaxSecret})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{secret} }{ \tau_1 \text{ is } \textsf{secret} \lor \tau_2 \text{ is } \textsf{secret} }$ &
+\vspace{0.25cm}
 
-$\infer[(\textsc{T-MaxPublic})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{public} }{ \tau_1 \text{ is } \textsf{public} \land \tau_2 \text{ is } \textsf{public} }$
-\end{tabular}
+The \textsf{max} function is defined as follows:
+
+\[ \textsf{max} : \tau \times \tau \rightarrow \tau = \begin{cases} 
+	\textsf{secret} & \text{if } \tau_1 \text{ is }  \textsf{secret} \lor \tau_2 \text{ is }  \textsf{secret} \\
+         \textsf{public} & \text{otherwise} \\
+\end{cases} \]
 
 \end{document}
