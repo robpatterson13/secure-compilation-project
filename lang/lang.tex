@@ -15,13 +15,13 @@
 
 \centering
 \begin{tabular}{cc}
-$\infer[(\text{T-Var})]{
+$\infer[(\textsc{T-Var})]{
     \Gamma \vdash x : \tau
 }{
     x : \tau \in \Gamma
 }$ &
 
-$\infer[(\text{T-Val})]{
+$\infer[(\textsc{T-Val})]{
     \vdash v : \textsf{public}
 }{}$
 \end{tabular} \\
@@ -29,9 +29,9 @@ $\infer[(\text{T-Val})]{
 \vspace{0.5cm}
 \centering
 \begin{tabular}{cc}
-$\infer[(\text{T-UnFun})]{ \Gamma \vdash \textsf{f\_un}(e) : \tau }{ \Gamma \vdash e : \tau }$ &
+$\infer[(\textsc{T-UnFun})]{ \Gamma \vdash \textsf{f\_un}(e) : \tau }{ \Gamma \vdash e : \tau }$ &
 
-$\infer[(\text{T-BinFun})]{ 
+$\infer[(\textsc{T-BinFun})]{ 
     \Gamma \vdash \textsf{f\_bin}(e_1, e_2) : \textsf{max}(\tau_1, \tau_2) 
 }{
     \Gamma \vdash e_1 : \tau_1
@@ -41,7 +41,7 @@ $\infer[(\text{T-BinFun})]{
 
 \vspace{0.5cm}
 \centering
-$\infer[(\text{T-Let})]{
+$\infer[(\textsc{T-Let})]{
     \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \textsf{max}(\tau_1, \tau_2) 
 }{
     \Gamma \vdash e_1 : \tau_1
@@ -51,9 +51,9 @@ $\infer[(\text{T-Let})]{
 \vspace{0.5cm}
 \centering
 \begin{tabular}{cc}
-$\infer[(\text{T-MaxSecret})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{secret} }{ \tau_1 \text{ is } \textsf{secret} \lor \tau_2 \text{ is } \textsf{secret} }$ &
+$\infer[(\textsc{T-MaxSecret})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{secret} }{ \tau_1 \text{ is } \textsf{secret} \lor \tau_2 \text{ is } \textsf{secret} }$ &
 
-$\infer[(\text{T-MaxPublic})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{public} }{ \tau_1 \text{ is } \textsf{public} \land \tau_2 \text{ is } \textsf{public} }$
+$\infer[(\textsc{T-MaxPublic})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{public} }{ \tau_1 \text{ is } \textsf{public} \land \tau_2 \text{ is } \textsf{public} }$
 \end{tabular}
 
 \end{document}
