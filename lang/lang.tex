@@ -42,7 +42,7 @@ $\infer[(\text{T-BinFun})]{
 \vspace{0.5cm}
 \centering
 $\infer[(\text{T-Let})]{
-    \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2
+    \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \textsf{max}(\tau_1, \tau_2) 
 }{
     \Gamma \vdash e_1 : \tau_1
     & \Gamma, x : \tau_1 \vdash e_2 : \tau_2
