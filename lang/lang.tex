@@ -1,0 +1,59 @@
+\documentclass{article}
+
+\usepackage{amsmath, amsthm}
+\usepackage{proof}
+
+\begin{document}
+
+\section{Language}
+\subsection{AST}
+
+\[ e := x \mid v \mid \textsf{f\_un}(e) \mid \textsf{f\_bin}(e, e) \mid \textsf{let } x = e \textsf{ in } e \]
+
+
+\subsection{Typing Rules}
+
+\centering
+\begin{tabular}{cc}
+$\infer[(\text{T-Var})]{
+    \Gamma \vdash x : \tau
+}{
+    x : \tau \in \Gamma
+}$ &
+
+$\infer[(\text{T-Val})]{
+    \vdash v : \textsf{public}
+}{}$
+\end{tabular} \\
+
+\vspace{0.5cm}
+\centering
+\begin{tabular}{cc}
+$\infer[(\text{T-UnFun})]{ \Gamma \vdash \textsf{f\_un}(e) : \tau }{ \Gamma \vdash e : \tau }$ &
+
+$\infer[(\text{T-BinFun})]{ 
+    \Gamma \vdash \textsf{f\_bin}(e_1, e_2) : \textsf{max}(\tau_1, \tau_2) 
+}{
+    \Gamma \vdash e_1 : \tau_1
+    & \Gamma \vdash e_2 : \tau_2
+}$
+\end{tabular} \\
+
+\vspace{0.5cm}
+\centering
+$\infer[(\text{T-Let})]{
+    \Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2
+}{
+    \Gamma \vdash e_1 : \tau_1
+    & \Gamma, x : \tau_1 \vdash e_2 : \tau_2
+}$
+
+\vspace{0.5cm}
+\centering
+\begin{tabular}{cc}
+$\infer[(\text{T-MaxSecret})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{secret} }{ \tau_1 \text{ is } \textsf{secret} \lor \tau_2 \text{ is } \textsf{secret} }$ &
+
+$\infer[(\text{T-MaxPublic})]{ \textsf{max}(\tau_1, \tau_2) \text{ is } \textsf{public} }{ \tau_1 \text{ is } \textsf{public} \land \tau_2 \text{ is } \textsf{public} }$
+\end{tabular}
+
+\end{document}
