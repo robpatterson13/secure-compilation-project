@@ -58,5 +58,36 @@ The \textsf{max} function is defined as follows:
 	\textsf{secret} & \text{if } \tau_1 \text{ is }  \textsf{secret} \lor \tau_2 \text{ is }  \textsf{secret} \\
          \textsf{public} & \text{otherwise} \\
 \end{cases} \]
+\\
+
+\subsection{Semantics}
+
+\begin{center}
+$\infer[(\textsc{Val})]{
+    v \Rightarrow v
+}{}$
+\end{center}
+
+\begin{center}
+\begin{tabular}{cc}
+$\infer[(\textsc{UnFun})]{f_{un}(e) \Rightarrow [[f_{un}]](v)}{e \Rightarrow v}$ &
+
+$\infer[(\textsc{BinFun})]{ f_{bin}(e_1, e_2) \Rightarrow [[f_{bin}(v_1, v_2)]]
+}{
+    e_1 \Rightarrow v_1
+    & e_2 \Rightarrow v_2
+}$
+\end{tabular} \\
+\end{center}
+
+\begin{center}
+$\infer[(\textsc{Let})]{
+   \textsf{let } x = e_1 \textsf{ in } e_2 \Rightarrow v_2
+}{
+     e_1 \Rightarrow v_1
+   & e_2[x \mapsto v_1] \Rightarrow v_2
+}$
+\end{center}
+
 
 \end{document}
