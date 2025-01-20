@@ -90,4 +90,22 @@ $\infer[(\textsc{Let})]{
 \end{center}
 
 
+
+\subsection{Non-Interference}
+
+$$\forall \gamma_1 \sim \gamma_2 : \Gamma_1 \left(
+\begin{array}{@{}c@{}}
+    \gamma_1 (e) \Downarrow v_1 \\
+    \gamma_2 (e) \Downarrow v_2
+\end{array}\right) \Rightarrow v_1 \sim v_2 : \tau$$
+
+$v \sim v_1 : \tau$
+
+\vskip 1em
+
+$\infer{v \sim v : \textsf{public}}{}{}$
+
+$\infer{v \sim v' : \textsf{private}}{}{}$
+
+
 \end{document}
