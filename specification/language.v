@@ -72,3 +72,22 @@ Inductive has_type : context -> tm -> ty -> Prop :=
     has_type Gamma e1 t1 ->
     has_type (update Gamma x t1) e2 t2 ->
     has_type Gamma (tm_let x e1 e2) t2.
+    
+Axiom f_un : nat -> nat.
+Axiom f_bin : nat -> nat -> nat.
+
+Inductive big_eval : tm -> nat -> Prop := 
+| Etm_val : forall v,
+  big_eval (tm_val v) v
+| Etm_un : forall e v v',
+  big_eval e v -> v' = f_un v -> 
+  big_eval (tm_un e) v'
+| Etm_bin : forall e1 e2 v1 v2 v,
+  big_eval e1 v1 -> 
+  big_eval e2 v2 -> 
+  v = f_bin v1 v2 -> 
+  big_eval (tm_bin e1 e2) v
+| Etm_let : forall x e1 e2 v1 v2,
+  big_eval e1 v1 -> 
+  big_eval (subst x (tm_val v1) e2) v2 -> 
+  big_eval (tm_let x e1 e2) v2.
