@@ -1,4 +1,6 @@
 From Coq Require Import Strings.String.
+Require Import List.
+Import ListNotations.
 
 Inductive tm : Type :=
 | tm_var : string -> tm
@@ -10,7 +12,7 @@ Inductive tm : Type :=
 Inductive ty : Type :=
 | Pub : ty
 | Sec : ty.
-
+    
 Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
   match t with
   | tm_var y => if String.eqb x y then s else t
@@ -24,12 +26,9 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
 
 Definition smap : Type := list (string * tm).
 
-Notation "x :: l" := (cons x l)
-                       (at level 60, right associativity).
-
 Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
   match bindings with
-  | nil => t
+  | [] => t
   | (x, e) :: rest =>
       let t' := subst x e t in
       subst_many rest t'
@@ -43,3 +42,33 @@ Definition max (t1 : ty) (t2 : ty) :=
   | Sec, Sec => Sec
   end.
 
+Definition context : Type := list (string * ty).
+
+Definition update (Gamma : context) (x : string) (t : ty) : context :=
+  (x, t) :: Gamma.
+
+Fixpoint lookup (Gamma : context) (x : string) : option ty :=
+  match Gamma with
+  | [] => None
+  | (y, t) :: Gamma' =>
+      if String.eqb x y then Some t
+      else lookup Gamma' x
+  end.
+
+Inductive has_type : context -> tm -> ty -> Prop :=
+| T_Var : forall Gamma x t1,
+    lookup Gamma x = Some t1 ->
+    has_type Gamma (tm_var x) t1
+| T_Val : forall Gamma v,
+    has_type Gamma (tm_val v) Pub
+| T_Un : forall Gamma e t,
+    has_type Gamma e t ->
+    has_type Gamma (tm_un e) t
+| T_Bin : forall Gamma e1 e2 t1 t2,
+    has_type Gamma e1 t1 ->
+    has_type Gamma e2 t2 ->
+    has_type Gamma (tm_bin e1 e2) (max t1 t2)
+| T_Let : forall Gamma e1 e2 x t1 t2,
+    has_type Gamma e1 t1 ->
+    has_type (update Gamma x t1) e2 t2 ->
+    has_type Gamma (tm_let x e1 e2) t2.
