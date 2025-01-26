@@ -91,3 +91,9 @@ Inductive big_eval : tm -> nat -> Prop :=
   big_eval e1 v1 -> 
   big_eval (subst x (tm_val v1) e2) v2 -> 
   big_eval (tm_let x e1 e2) v2.
+
+Inductive type_rel : ty -> nat -> nat -> Prop :=
+| TR_Pub : forall v,
+  type_rel Pub v v
+| TR_Sec : forall v1 v2,
+  type_rel Sec v1 v2.
