@@ -13,9 +13,9 @@ Inductive ty : Type :=
 | Pub : ty
 | Sec : ty.
     
-Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
+Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   match t with
-  | tm_var y => if String.eqb x y then s else t
+  | tm_var y => if String.eqb x y then tm_val s else t
   | tm_val _ => t 
   | tm_bin t1 t2 => tm_bin (subst x s t1) (subst x s t2)
   | tm_un t1 => tm_un (subst x s t1)
@@ -24,7 +24,7 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
       tm_let x_b (subst x s e) body
   end.
 
-Definition smap : Type := list (string * tm).
+Definition smap : Type := list (string * nat).
 
 Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
   match bindings with
@@ -47,12 +47,12 @@ Definition context : Type := list (string * ty).
 Definition update (Gamma : context) (x : string) (t : ty) : context :=
   (x, t) :: Gamma.
 
-Fixpoint lookup (Gamma : context) (x : string) : option ty :=
-  match Gamma with
+Fixpoint lookup {A} (m : list (string * A)) (x : string) : option A :=
+  match m with
   | [] => None
-  | (y, t) :: Gamma' =>
+  | (y, t) :: m' =>
       if String.eqb x y then Some t
-      else lookup Gamma' x
+      else lookup m' x
   end.
 
 Inductive has_type : context -> tm -> ty -> Prop :=
@@ -89,7 +89,7 @@ Inductive big_eval : tm -> nat -> Prop :=
   big_eval (tm_bin e1 e2) v
 | Etm_let : forall x e1 e2 v1 v2,
   big_eval e1 v1 -> 
-  big_eval (subst x (tm_val v1) e2) v2 -> 
+  big_eval (subst x v1 e2) v2 -> 
   big_eval (tm_let x e1 e2) v2.
 
 Inductive type_rel : ty -> nat -> nat -> Prop :=
@@ -97,3 +97,70 @@ Inductive type_rel : ty -> nat -> nat -> Prop :=
   type_rel Pub v v
 | TR_Sec : forall v1 v2,
   type_rel Sec v1 v2.
+
+Definition type_rel_2 (t : ty) (v1 v2 : nat) :=
+  match t with
+    | Pub => v1 = v2 
+    | Sec => True end.
+                        
+
+Definition subst_rel : context -> smap -> smap -> Prop :=
+  fun G g1 g2 =>
+    forall (x : string),
+      match lookup G x, lookup g1 x, lookup g2 x with
+        | None, _, _ => True
+        | Some t, Some v1, Some v2 => 
+            type_rel t v1 v2
+        | Some t, _, _ => False end.
+            
+
+Theorem big_eval_det (t : tm) (v1 v2 : nat) : 
+  big_eval t v1 ->
+  big_eval t v2 ->
+  v1 = v2.
+  intros h1; revert v2.
+  induction h1.
+  {
+    intros v2 h2.
+    inversion h2.
+    reflexivity.
+  }
+  {
+    intros v2 h2.
+    subst.
+    inversion h2; subst.
+    rewrite (IHh1 _ H0).
+    reflexivity.
+  }
+  {
+    (* TODO *)
+    admit.
+  }
+  {
+    intros v0 h.
+    inversion h; subst; clear h.
+    specialize (IHh1_1 _ H3); subst.
+    apply IHh1_2.
+    apply H4.
+  }
+Admitted.    
+
+
+Definition has_sem_type : context -> tm -> ty -> Prop  :=
+  fun Gamma e t =>
+    forall g1 g2 v1 v2,
+      subst_rel Gamma g1 g2 ->
+      big_eval (subst_many g1 e) v1 ->
+      big_eval (subst_many g2 e) v2 ->
+      type_rel t v1 v2.
+
+Theorem noninterference G e t :
+  has_type G e t ->
+  has_sem_type G e t.
+  intros h.
+  induction h.
+  (* TODO *)
+Admitted.
+      
+    
+    
