@@ -147,7 +147,7 @@ Theorem big_eval_det (t : tm) (v1 v2 : nat) :
     apply IHh1_2.
     apply H4.
   }
-Admitted.    
+Qed.    
 
 
 Definition has_sem_type : context -> tm -> ty -> Prop  :=
