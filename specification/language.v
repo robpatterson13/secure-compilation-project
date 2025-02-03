@@ -133,8 +133,12 @@ Theorem big_eval_det (t : tm) (v1 v2 : nat) :
     reflexivity.
   }
   {
-    (* TODO *)
-    admit.
+    intros v3 h3.
+    subst.
+    inversion h3; subst.
+    rewrite (IHh1_2 _ H2).
+    rewrite (IHh1_1 _ H1).
+    reflexivity.
   }
   {
     intros v0 h.
