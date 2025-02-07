@@ -158,12 +158,74 @@ Definition has_sem_type : context -> tm -> ty -> Prop  :=
       big_eval (subst_many g2 e) v2 ->
       type_rel t v1 v2.
 
+Lemma subst_many_val g v : 
+  subst_many g (tm_val v) = tm_val v.
+  induction g.
+  simpl.
+  reflexivity.
+  simpl.
+  
+  destruct a.
+  apply IHg.
+Qed.
+
+Lemma subst_many_tm_bin g e1 e2 : 
+  subst_many g (tm_bin e1 e2) = 
+    tm_bin (subst_many g e1) (subst_many g e2).
+  revert e1 e2. 
+  induction g.
+  simpl; reflexivity.
+  simpl.
+  destruct a.
+  intros e1 e2.
+  rewrite IHg; reflexivity.
+Qed.
+  
+(* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
+  
+(*
+  - simpl, simpl at *
+  - subst
+  - rewrite H at H2, or just rewrite H
+  - apply H
+  - inversion H, if H is an inductive prop
+  - intros and revert
+  - assert (h : ...) with { } 
+  - destruct
+  - writing and applying sub-lemmas
+*)
+
+(*
+  - If your inductive hypothesis doesn't match up, consider calling revert to generalize before inducting 
+
+*)
+
 Theorem noninterference G e t :
   has_type G e t ->
   has_sem_type G e t.
   intros h.
   induction h.
-  (* TODO *)
+  {
+    admit.
+  }
+  {
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 h1 h2 h3.
+    rewrite subst_many_val in h2.
+    rewrite subst_many_val in h3.
+    inversion h2; subst.
+    inversion h3; subst.
+    apply TR_Pub.
+  }
+  {
+    admit.
+  }
+  {
+    admit.
+  }
+  {
+    admit.
+  }
 Admitted.
       
     
