@@ -180,7 +180,17 @@ Lemma subst_many_tm_bin g e1 e2 :
   intros e1 e2.
   rewrite IHg; reflexivity.
 Qed.
-  
+
+Lemma subst_many_un : forall g u, 
+  subst_many g (tm_un u) = tm_un (subst_many g u).
+  intros g. induction g.
+  - intros u. simpl. reflexivity.
+  - intros u. simpl. 
+    destruct a.
+    rewrite IHg.
+    reflexivity.
+Qed.
+
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
   
 (*
@@ -218,7 +228,16 @@ Theorem noninterference G e t :
     apply TR_Pub.
   }
   {
-    admit.
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 h1 h2 h3.
+    rewrite subst_many_un in h2.
+    rewrite subst_many_un in h3.
+    inversion h2; subst.
+    inversion h3; subst.
+
+    destruct (IHh g1 g2 v v0 h1 H0 H1); subst.
+    - apply TR_Pub.
+    - apply TR_Sec.
   }
   {
     admit.
