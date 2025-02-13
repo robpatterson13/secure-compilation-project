@@ -12,7 +12,7 @@ Inductive tm : Type :=
 Inductive ty : Type :=
 | Pub : ty
 | Sec : ty.
-    
+
 Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   match t with
   | tm_var y => if String.eqb x y then tm_val s else t
@@ -191,6 +191,26 @@ Lemma subst_many_un : forall g u,
     reflexivity.
 Qed.
 
+(*Lemma subst_many_let : forall g id e b,
+    subst_many g (tm_let id e b) = *)
+
+Lemma subst_many_var :
+  forall (g : smap) (x : string),
+    subst_many g (tm_var x) =
+      match lookup g x with
+      | None => tm_var x
+      | Some n => tm_val n
+      end.
+Proof.
+  intros g x. 
+  induction g as [| [y val] g' IH]; simpl.
+  - reflexivity.
+  - destruct (String.eqb y x) eqn:Heq.
+    + apply String.eqb_eq in Heq; subst.
+      rewrite subst_many_val. rewrite String.eqb_refl. reflexivity.
+    + rewrite <- String.eqb_sym. rewrite Heq. apply IH.
+Qed.
+
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
   
 (*
@@ -216,7 +236,17 @@ Theorem noninterference G e t :
   intros h.
   induction h.
   {
-    admit.
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 h1 Hv1 Hv2.
+    specialize (h1 x).
+    destruct (lookup g1 x) eqn:E1; [ | (rewrite H in h1; contradiction) ].
+    destruct (lookup g2 x) eqn:E2; [ | (rewrite H in h1; contradiction) ].
+    rewrite (subst_many_var g1 x) in Hv1; rewrite E1 in Hv1; simpl in Hv1.
+    rewrite (subst_many_var g2 x) in Hv2; rewrite E2 in Hv2; simpl in Hv2.
+    inversion Hv1; subst.
+    inversion Hv2; subst.
+    rewrite H in h1.
+    exact h1.    
   }
   {
     unfold has_sem_type.
@@ -235,14 +265,29 @@ Theorem noninterference G e t :
     inversion h2; subst.
     inversion h3; subst.
 
-    destruct (IHh g1 g2 v v0 h1 H0 H1); subst.
-    - apply TR_Pub.
-    - apply TR_Sec.
+    destruct (IHh g1 g2 v v0 h1 H0 H1); subst; constructor.
   }
   {
-    admit.
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+    rewrite subst_many_tm_bin in h_eval1.
+    rewrite subst_many_tm_bin in h_eval2.
+    inversion h_eval1; subst.
+    inversion h_eval2; subst.
+
+    destruct (IHh1 g1 g2 v0 v1 h_sub H1 H3); subst.
+    destruct (IHh2 g1 g2 v3 v4 h_sub H2 H4); subst.
+
+    - simpl.
+      constructor.
+    - simpl.
+      constructor.
+    - simpl.
+      destruct t2; constructor.
   }
   {
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 h_sub h_eval1 h_eval2.
     admit.
   }
 Admitted.
