@@ -20,7 +20,7 @@ Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   | tm_bin t1 t2 => tm_bin (subst x s t1) (subst x s t2)
   | tm_un t1 => tm_un (subst x s t1)
   | tm_let x_b e b =>
-      let body := if String.eqb x_b x then b else (subst x s b) in
+      let body := if String.eqb x x_b then b else (subst x s b) in
       tm_let x_b (subst x s e) body
   end.
 
@@ -193,8 +193,14 @@ Qed.
 
 Lemma subst_many_let : forall g id e b,
     subst_many g (tm_let id e b) = tm_let id (subst_many g e) (subst_many (filter (fun x => negb (String.eqb (fst x) id)) g) b).
-Admitted.
-Search filter.
+  intros g id e b.
+  revert e b.
+  induction g; simpl.
+  - reflexivity.
+  - destruct a; simpl.
+    destruct (String.eqb s id); simpl;
+      intros e b; apply IHg.
+Qed.
 
 Lemma subst_many_var :
   forall (g : smap) (x : string),
