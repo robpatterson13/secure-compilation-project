@@ -44,7 +44,7 @@ Definition max (t1 : ty) (t2 : ty) :=
 
 Definition context : Type := list (string * ty).
 
-Definition update (Gamma : context) (x : string) (t : ty) : context :=
+Definition update {A} (Gamma : list (string * A)) (x : string) (t : A) : list (string * A) :=
   (x, t) :: Gamma.
 
 Fixpoint lookup {A} (m : list (string * A)) (x : string) : option A :=
@@ -191,8 +191,10 @@ Lemma subst_many_un : forall g u,
     reflexivity.
 Qed.
 
-(*Lemma subst_many_let : forall g id e b,
-    subst_many g (tm_let id e b) = *)
+Lemma subst_many_let : forall g id e b,
+    subst_many g (tm_let id e b) = tm_let id (subst_many g e) (subst_many (filter (fun x => negb (String.eqb (fst x) id)) g) b).
+Admitted.
+Search filter.
 
 Lemma subst_many_var :
   forall (g : smap) (x : string),
@@ -288,7 +290,13 @@ Theorem noninterference G e t :
   {
     unfold has_sem_type.
     intros g1 g2 v1 v2 h_sub h_eval1 h_eval2.
-    admit.
+    rewrite subst_many_let in h_eval1.
+    rewrite subst_many_let in h_eval2.
+    inversion h_eval1; subst.
+    inversion h_eval2; subst.
+
+    unfold has_sem_type in IHh2.
+    specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2).
   }
 Admitted.
       
