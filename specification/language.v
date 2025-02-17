@@ -193,8 +193,7 @@ Qed.
 
 Lemma subst_many_let : forall g id e b,
     subst_many g (tm_let id e b) = tm_let id (subst_many g e) (subst_many (filter (fun x => negb (String.eqb (fst x) id)) g) b).
-  intros g id e b.
-  revert e b.
+  intros g id.
   induction g; simpl.
   - reflexivity.
   - destruct a; simpl.
