@@ -293,6 +293,7 @@ Lemma subst_many_subst_commute:
     + apply IHg.
 Qed.
 
+(* can get rid of next two lemmas; redundant *)
 Lemma subst_rel_after_Pub_update:
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v : nat),
     subst_rel Gamma g1 g2 ->
@@ -343,9 +344,20 @@ Lemma subst_rel_after_update:
       (update g1 x v1)
       (update g2 x v2).
   intros.
-  inversion H.
-  - apply (subst_rel_after_Pub_update Gamma g1 g2 x v2 H0).
-  - apply (subst_rel_after_Sec_update Gamma g1 g2 x v1 v2 H0).
+  inversion H;
+  unfold subst_rel;
+  intro; specialize (H0 x0);
+  destruct (lookup Gamma x0) eqn:H_Gamma in H0;
+    destruct (lookup g1 x0) eqn:H_g1 in H0;
+    destruct (lookup g2 x0) eqn:H_g2 in H0;
+    simpl;
+    destruct (String.eqb x0 x);
+    try rewrite H_Gamma;
+    try rewrite H_g1;
+    try rewrite H_g2;
+    try apply TR_Sec;
+    try apply TR_Pub;
+    auto.
 Qed.
 
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
