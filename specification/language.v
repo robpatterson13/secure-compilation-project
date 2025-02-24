@@ -1,38 +1,8 @@
 From Coq Require Import Strings.String.
 Require Import List.
 Import ListNotations.
+Require Import Lang.
 
-Inductive tm : Type :=
-| tm_var : string -> tm
-| tm_val : nat -> tm
-| tm_bin : tm -> tm -> tm
-| tm_un : tm -> tm
-| tm_let : string -> tm -> tm -> tm.
-
-Inductive ty : Type :=
-| Pub : ty
-| Sec : ty.
-
-Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
-  match t with
-  | tm_var y => if String.eqb x y then tm_val s else t
-  | tm_val _ => t 
-  | tm_bin t1 t2 => tm_bin (subst x s t1) (subst x s t2)
-  | tm_un t1 => tm_un (subst x s t1)
-  | tm_let x_b e b =>
-      let body := if String.eqb x x_b then b else (subst x s b) in
-      tm_let x_b (subst x s e) body
-  end.
-
-Definition smap : Type := list (string * nat).
-
-Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
-  match bindings with
-  | [] => t
-  | (x, e) :: rest =>
-      let t' := subst x e t in
-      subst_many rest t'
-  end.
 
 Definition max (t1 : ty) (t2 : ty) :=
   match t1, t2 with
@@ -44,16 +14,6 @@ Definition max (t1 : ty) (t2 : ty) :=
 
 Definition context : Type := list (string * ty).
 
-Definition update {A} (Gamma : list (string * A)) (x : string) (t : A) : list (string * A) :=
-  (x, t) :: Gamma.
-
-Fixpoint lookup {A} (m : list (string * A)) (x : string) : option A :=
-  match m with
-  | [] => None
-  | (y, t) :: m' =>
-      if String.eqb x y then Some t
-      else lookup m' x
-  end.
 
 Inductive has_type : context -> tm -> ty -> Prop :=
 | T_Var : forall Gamma x t1,
@@ -346,24 +306,20 @@ Lemma subst_rel_after_update:
     subst_rel (update Gamma x t)
       (update (filter_smap g1 x) x v1)
       (update (filter_smap g2 x) x v2).
-  (*
   intros.
-  inversion H;
-  unfold subst_rel;
-  intro; specialize (H0 x0);
-  destruct (lookup Gamma x0) eqn:H_Gamma in H0;
-    destruct (lookup g1 x0) eqn:H_g1 in H0;
-    destruct (lookup g2 x0) eqn:H_g2 in H0;
-    simpl;
-    destruct (String.eqb x0 x);
-    try rewrite H_Gamma;
-    try rewrite H_g1;
-    try rewrite H_g2;
-    try apply TR_Sec;
-    try apply TR_Pub;
-    auto.
-*)
+  intro.
+  unfold update.
+  simpl.
+  destruct (x0 =? x)%string eqn:h.
+  auto.
+  destruct (lookup Gamma x0) eqn:h'; auto.
+  destruct (lookup (filter_smap g1 x) x0) eqn:h''.
+  destruct (lookup (filter_smap g2 x) x0) eqn:h'''.
+  admit.
+  admit.
+  admit.
 Admitted.
+
 
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
   
