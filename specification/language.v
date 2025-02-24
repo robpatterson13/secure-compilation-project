@@ -293,6 +293,61 @@ Lemma subst_many_subst_commute:
     + apply IHg.
 Qed.
 
+Lemma subst_rel_after_Pub_update:
+  forall (Gamma : context) (g1 g2 : smap) (x : string) (v : nat),
+    subst_rel Gamma g1 g2 ->
+    subst_rel (update Gamma x Pub)
+      (update g1 x v)
+      (update g2 x v).
+  intros.
+  unfold subst_rel.
+  intro. specialize (H x0).
+  destruct (lookup Gamma x0) eqn:H_Gamma in H;
+    destruct (lookup g1 x0) eqn:H_g1 in H;
+    destruct (lookup g2 x0) eqn:H_g2 in H;
+    simpl;
+    destruct (String.eqb x0 x);
+    try apply TR_Pub;
+    try rewrite H_Gamma;
+    try rewrite H_g1;
+    try rewrite H_g2;
+    auto.
+Qed.
+
+Lemma subst_rel_after_Sec_update:
+  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
+    subst_rel Gamma g1 g2 ->
+    subst_rel (update Gamma x Sec)
+      (update g1 x v1)
+      (update g2 x v2).
+  intros.
+  unfold subst_rel.
+  intro. specialize (H x0).
+  destruct (lookup Gamma x0) eqn:H_Gamma in H;
+    destruct (lookup g1 x0) eqn:H_g1 in H;
+    destruct (lookup g2 x0) eqn:H_g2 in H;
+    simpl;
+    destruct (String.eqb x0 x);
+    try apply TR_Sec;
+    try rewrite H_Gamma;
+    try rewrite H_g1;
+    try rewrite H_g2;
+    auto.
+Qed.
+    
+Lemma subst_rel_after_update:
+  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (t : ty),
+    type_rel t v1 v2 ->
+    subst_rel Gamma g1 g2 ->
+    subst_rel (update Gamma x t)
+      (update g1 x v1)
+      (update g2 x v2).
+  intros.
+  inversion H.
+  - apply (subst_rel_after_Pub_update Gamma g1 g2 x v2 H0).
+  - apply (subst_rel_after_Sec_update Gamma g1 g2 x v1 v2 H0).
+Qed.
+
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
   
 (*
@@ -413,61 +468,6 @@ Theorem noninterference G e t :
     
     rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
-
-    assert (H_subst_rel_after_Pub_update: forall Gamma g1 g2 x v,
-               subst_rel Gamma g1 g2 ->
-               subst_rel (update Gamma x Pub)
-                 (update g1 x v)
-                 (update g2 x v)). {
-
-      intros.
-      unfold subst_rel.
-      intro. specialize (H x1).
-      destruct (lookup Gamma0 x1) eqn:H_Gamma0 in H;
-        destruct (lookup g0 x1) eqn:H_g0 in H;
-        destruct (lookup g3 x1) eqn:H_g3 in H;
-        simpl;
-        destruct (String.eqb x1 x0);
-        try apply TR_Pub;
-        try rewrite H_Gamma0;
-        try rewrite H_g0;
-        try rewrite H_g3;
-        auto.
-    }
-
-    assert (H_subst_rel_after_Sec_update: forall Gamma g1 g2 x v1 v2,
-               subst_rel Gamma g1 g2 ->
-               subst_rel (update Gamma x Sec)
-                 (update g1 x v1)
-                 (update g2 x v2)). {
-
-      intros.
-      unfold subst_rel.
-      intro. specialize (H x1).
-      destruct (lookup Gamma0 x1) eqn:H_Gamma0 in H;
-        destruct (lookup g0 x1) eqn:H_g0 in H;
-        destruct (lookup g3 x1) eqn:H_g3 in H;
-        simpl;
-        destruct (String.eqb x1 x0);
-        try apply TR_Sec;
-        try rewrite H_Gamma0;
-        try rewrite H_g0;
-        try rewrite H_g3;
-        auto.
-    }
-    
-    assert (forall Gamma g1 g2 x v1 v2 t,
-               type_rel t v1 v2 ->
-               subst_rel Gamma g1 g2 ->
-               subst_rel (update Gamma x t)
-                 (update g1 x v1)
-                 (update g2 x v2)). {
-
-      intros.
-      inversion H.
-      - apply (H_subst_rel_after_Pub_update Gamma0 g0 g3 x0 v5 H0).
-      - apply (H_subst_rel_after_Sec_update Gamma0 g0 g3 x0 v4 v5 H0).
-    }
     
     assert (type_rel t1 v0 v3). {
       admit.
@@ -492,16 +492,16 @@ Theorem noninterference G e t :
                subst_rel Gamma g1 g2 ->
                subst_rel Gamma (update (filter p g1) x v1) (update (filter p g2) x v2)). {
       intros.
-      unfold subst_rel; unfold subst_rel in H7.
-      intro; specialize (H7 x1).
+      unfold subst_rel; unfold subst_rel in H2.
+      intro; specialize (H2 x1).
       destruct (lookup Gamma0 x1); auto.
-      destruct (lookup g0 x1) eqn:H_g0 in H7;
-        destruct (lookup g3 x1) eqn:H_g3 in H7;
+      destruct (lookup g0 x1) eqn:H_g0 in H2;
+        destruct (lookup g3 x1) eqn:H_g3 in H2;
         destruct (lookup (update (filter p g0) x0 v4) x1) eqn:H_updated_g0;
         destruct (lookup (update (filter p g3) x0 v5) x1) eqn:H_updated_g3;
         auto;
-        inversion H7.
-      - inversion H2.
+        inversion H2.
+      - inversion H1.
         + admit.
         + admit.
       - apply TR_Sec.
@@ -520,17 +520,18 @@ Theorem noninterference G e t :
       admit.
     }
     
-    specialize (H Gamma
+    pose proof (subst_rel_after_update
+                  Gamma
                   (filter (fun y => negb (String.eqb (fst y) x)) g1)
                   (filter (fun y => negb (String.eqb (fst y) x)) g2)
                   x
                   v0
                   v3
                   t1
-                  H0
-                  H7).
+                  H
+                  H2).
     
-    apply (IHh2 H H4 H6).
+    apply (IHh2 H7 H4 H6).
     
 Admitted.
     
