@@ -335,14 +335,18 @@ Lemma subst_rel_after_Sec_update:
     try rewrite H_g2;
     auto.
 Qed.
+
+Definition filter_smap (g : smap) (x : string) : smap :=
+  filter (fun y => negb (String.eqb (fst y) x)) g.
     
 Lemma subst_rel_after_update:
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (t : ty),
     type_rel t v1 v2 ->
     subst_rel Gamma g1 g2 ->
     subst_rel (update Gamma x t)
-      (update g1 x v1)
-      (update g2 x v2).
+      (update (filter_smap g1 x) x v1)
+      (update (filter_smap g2 x) x v2).
+  (*
   intros.
   inversion H;
   unfold subst_rel;
@@ -358,7 +362,8 @@ Lemma subst_rel_after_update:
     try apply TR_Sec;
     try apply TR_Pub;
     auto.
-Qed.
+*)
+Admitted.
 
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
   
@@ -481,28 +486,17 @@ Theorem noninterference G e t :
     rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
     
-    assert (type_rel t1 v0 v3). {
-      admit.
+    unfold has_sem_type in IHh1.
+    apply IHh2.
+    apply subst_rel_after_update.
+    eapply IHh1.
+    apply h_sub.
+    apply H3.
+    apply H5.
+    apply h_sub.
+    apply H4.
+    apply H6.
     }
-
-    assert (subst_rel Gamma (filter (fun y : string * nat => negb (fst y =? x)%string) g1)
-              (filter (fun y : string * nat => negb (fst y =? x)%string) g2)). {
-      admit.
-    }
-    
-    pose proof (subst_rel_after_update
-                  Gamma
-                  (filter (fun y => negb (String.eqb (fst y) x)) g1)
-                  (filter (fun y => negb (String.eqb (fst y) x)) g2)
-                  x
-                  v0
-                  v3
-                  t1
-                  H
-                  H0).
-    
-    apply (IHh2 H1 H4 H6).
-    
-Admitted.
+Qed.
     
     
