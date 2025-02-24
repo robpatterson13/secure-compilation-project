@@ -413,15 +413,123 @@ Theorem noninterference G e t :
     
     rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
-     
-    assert (forall Gamma x t g1 g2 v1 v2,
+
+    assert (H_subst_rel_after_Pub_update: forall Gamma g1 g2 x v,
+               subst_rel Gamma g1 g2 ->
+               subst_rel (update Gamma x Pub)
+                 (update g1 x v)
+                 (update g2 x v)). {
+
+      intros.
+      unfold subst_rel.
+      intro. specialize (H x1).
+      destruct (lookup Gamma0 x1) eqn:H_Gamma0 in H;
+        destruct (lookup g0 x1) eqn:H_g0 in H;
+        destruct (lookup g3 x1) eqn:H_g3 in H;
+        simpl;
+        destruct (String.eqb x1 x0);
+        try apply TR_Pub;
+        try rewrite H_Gamma0;
+        try rewrite H_g0;
+        try rewrite H_g3;
+        auto.
+    }
+
+    assert (H_subst_rel_after_Sec_update: forall Gamma g1 g2 x v1 v2,
+               subst_rel Gamma g1 g2 ->
+               subst_rel (update Gamma x Sec)
+                 (update g1 x v1)
+                 (update g2 x v2)). {
+
+      intros.
+      unfold subst_rel.
+      intro. specialize (H x1).
+      destruct (lookup Gamma0 x1) eqn:H_Gamma0 in H;
+        destruct (lookup g0 x1) eqn:H_g0 in H;
+        destruct (lookup g3 x1) eqn:H_g3 in H;
+        simpl;
+        destruct (String.eqb x1 x0);
+        try apply TR_Sec;
+        try rewrite H_Gamma0;
+        try rewrite H_g0;
+        try rewrite H_g3;
+        auto.
+    }
+    
+    assert (forall Gamma g1 g2 x v1 v2 t,
+               type_rel t v1 v2 ->
+               subst_rel Gamma g1 g2 ->
                subst_rel (update Gamma x t)
                  (update g1 x v1)
                  (update g2 x v2)). {
+
+      intros.
+      inversion H.
+      - apply (H_subst_rel_after_Pub_update Gamma0 g0 g3 x0 v5 H0).
+      - apply (H_subst_rel_after_Sec_update Gamma0 g0 g3 x0 v4 v5 H0).
+    }
+    
+    assert (type_rel t1 v0 v3). {
       admit.
     }
+    
+    assert (forall (g : smap) x p n1 n2,
+               lookup g x = Some n1 ->
+               lookup (filter p g) x = Some n2 ->
+               n1 = n2). {
 
-    specialize (H Gamma x t1 (filter (fun y => negb (String.eqb (fst y) x)) g1) (filter (fun y => negb (String.eqb (fst y) x)) g2) v0 v3).
+      intros.
+      induction g.
+      - simpl in H1.
+        discriminate.
+      - apply IHg; destruct a; admit.
+    }
+      
+
+    (* have to add the update around the filters here *)
+    assert (forall Gamma g1 g2 x v1 v2 t p,
+               type_rel t v1 v2 ->
+               subst_rel Gamma g1 g2 ->
+               subst_rel Gamma (update (filter p g1) x v1) (update (filter p g2) x v2)). {
+      intros.
+      unfold subst_rel; unfold subst_rel in H7.
+      intro; specialize (H7 x1).
+      destruct (lookup Gamma0 x1); auto.
+      destruct (lookup g0 x1) eqn:H_g0 in H7;
+        destruct (lookup g3 x1) eqn:H_g3 in H7;
+        destruct (lookup (update (filter p g0) x0 v4) x1) eqn:H_updated_g0;
+        destruct (lookup (update (filter p g3) x0 v5) x1) eqn:H_updated_g3;
+        auto;
+        inversion H7.
+      - inversion H2.
+        + admit.
+        + admit.
+      - apply TR_Sec.
+      (* all of these falses are due to lookup Gamma x finding Some nat
+             but the gamma lookups failing *)
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+    }
+
+    assert (subst_rel Gamma (filter (fun y : string * nat => negb (fst y =? x)%string) g1)
+              (filter (fun y : string * nat => negb (fst y =? x)%string) g2)). {
+      admit.
+    }
+    
+    specialize (H Gamma
+                  (filter (fun y => negb (String.eqb (fst y) x)) g1)
+                  (filter (fun y => negb (String.eqb (fst y) x)) g2)
+                  x
+                  v0
+                  v3
+                  t1
+                  H0
+                  H7).
+    
     apply (IHh2 H H4 H6).
     
 Admitted.
