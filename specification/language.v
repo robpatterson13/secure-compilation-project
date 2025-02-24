@@ -484,48 +484,6 @@ Theorem noninterference G e t :
     assert (type_rel t1 v0 v3). {
       admit.
     }
-    
-    assert (forall (g : smap) x p n1 n2,
-               lookup g x = Some n1 ->
-               lookup (filter p g) x = Some n2 ->
-               n1 = n2). {
-
-      intros.
-      induction g.
-      - simpl in H1.
-        discriminate.
-      - apply IHg; destruct a; admit.
-    }
-      
-
-    (* have to add the update around the filters here *)
-    assert (forall Gamma g1 g2 x v1 v2 t p,
-               type_rel t v1 v2 ->
-               subst_rel Gamma g1 g2 ->
-               subst_rel Gamma (update (filter p g1) x v1) (update (filter p g2) x v2)). {
-      intros.
-      unfold subst_rel; unfold subst_rel in H2.
-      intro; specialize (H2 x1).
-      destruct (lookup Gamma0 x1); auto.
-      destruct (lookup g0 x1) eqn:H_g0 in H2;
-        destruct (lookup g3 x1) eqn:H_g3 in H2;
-        destruct (lookup (update (filter p g0) x0 v4) x1) eqn:H_updated_g0;
-        destruct (lookup (update (filter p g3) x0 v5) x1) eqn:H_updated_g3;
-        auto;
-        inversion H2.
-      - inversion H1.
-        + admit.
-        + admit.
-      - apply TR_Sec.
-      (* all of these falses are due to lookup Gamma x finding Some nat
-             but the gamma lookups failing *)
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-    }
 
     assert (subst_rel Gamma (filter (fun y : string * nat => negb (fst y =? x)%string) g1)
               (filter (fun y : string * nat => negb (fst y =? x)%string) g2)). {
@@ -541,9 +499,9 @@ Theorem noninterference G e t :
                   v3
                   t1
                   H
-                  H2).
+                  H0).
     
-    apply (IHh2 H7 H4 H6).
+    apply (IHh2 H1 H4 H6).
     
 Admitted.
     
