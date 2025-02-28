@@ -1,3 +1,3 @@
 all: 
-	coqc Lang.v
-	coqc language.v
+	coqc Dynamics.v
+	coqc Statics.v

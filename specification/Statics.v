@@ -1,16 +1,41 @@
 From Coq Require Import Strings.String.
 Require Import List.
 Import ListNotations.
-Require Import Lang.
+Require Import Dynamics.
 
+Inductive ty :=
+  | Pub
+  | Middle
+  | Sec.
 
-Definition max (t1 : ty) (t2 : ty) :=
+Scheme Equality for ty.
+
+Definition max (t1 : ty) (t2 : ty) : ty.
+  Admitted.
+(* TODO 1 : new max function *)
+
+(*
   match t1, t2 with
   | Pub, Pub => Pub
   | Pub, Sec => Sec
   | Sec, Pub => Sec
   | Sec, Sec => Sec
   end.
+*)
+
+(* TODO 2 : define this directly *)
+Definition le (t1 t2 : ty) : bool.
+Admitted.
+
+(* TODO: prove that le is a partial order *)
+(* - Reflexive *)
+(* - Transitive *)
+
+(* TODO *)
+Lemma le_max_eq (t1 t2 : ty) : 
+  le t1 t2 = true ->
+  max t1 t2 = t2.
+Admitted.
 
 Definition context : Type := list (string * ty).
 
@@ -33,47 +58,37 @@ Inductive has_type : context -> tm -> ty -> Prop :=
     has_type (update Gamma x t1) e2 t2 ->
     has_type Gamma (tm_let x e1 e2) t2.
     
-Axiom f_un : nat -> nat.
-Axiom f_bin : nat -> nat -> nat.
 
-Inductive big_eval : tm -> nat -> Prop := 
-| Etm_val : forall v,
-  big_eval (tm_val v) v
-| Etm_un : forall e v v',
-  big_eval e v -> v' = f_un v -> 
-  big_eval (tm_un e) v'
-| Etm_bin : forall e1 e2 v1 v2 v,
-  big_eval e1 v1 -> 
-  big_eval e2 v2 -> 
-  v = f_bin v1 v2 -> 
-  big_eval (tm_bin e1 e2) v
-| Etm_let : forall x e1 e2 v1 v2,
-  big_eval e1 v1 -> 
-  big_eval (subst x v1 e2) v2 -> 
-  big_eval (tm_let x e1 e2) v2.
+(*
+Idea: generalize type_rel to have type ty -> ty -> nat -> nat -> Prop.
 
-Inductive type_rel : ty -> nat -> nat -> Prop :=
-| TR_Pub : forall v,
-  type_rel Pub v v
-| TR_Sec : forall v1 v2,
-  type_rel Sec v1 v2.
+First argument: o : "observer label"
+    - If t <= o, then type_rel o t v1 v2
+    - Otherwise: type_rel o t1 v1 v2 <-> old_type_rel Sec v1 v2
+*)
 
-Definition type_rel_2 (t : ty) (v1 v2 : nat) :=
-  match t with
-    | Pub => v1 = v2 
-    | Sec => True end.
-                        
 
-Definition subst_rel : context -> smap -> smap -> Prop :=
+Inductive type_rel : ty -> ty -> nat -> nat -> Prop :=
+  | TR_Low : forall o t v, 
+      type_rel o t v v
+  | TR_High : forall o t v1 v2,
+      le t o = false -> 
+      type_rel o t v1 v2.
+
+
+(* TODO: adapt for type_rel *)
+Definition subst_rel (o : ty) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
     forall (x : string),
       match lookup G x, lookup g1 x, lookup g2 x with
         | None, _, _ => True
         | Some t, Some v1, Some v2 => 
-            type_rel t v1 v2
+            type_rel o t v1 v2
         | Some t, _, _ => False end.
             
 
+(* TODO: move this to Dynamics.v *)
+(* 
 Theorem big_eval_det (t : tm) (v1 v2 : nat) : 
   big_eval t v1 ->
   big_eval t v2 ->
@@ -108,16 +123,18 @@ Theorem big_eval_det (t : tm) (v1 v2 : nat) :
     apply H4.
   }
 Qed.    
+*)
 
 
-Definition has_sem_type : context -> tm -> ty -> Prop  :=
+Definition has_sem_type (o : ty) : context -> tm -> ty -> Prop  :=
   fun Gamma e t =>
     forall g1 g2 v1 v2,
-      subst_rel Gamma g1 g2 ->
+      subst_rel o Gamma g1 g2 ->
       big_eval (subst_many g1 e) v1 ->
       big_eval (subst_many g2 e) v2 ->
-      type_rel t v1 v2.
+      type_rel o t v1 v2.
 
+(* TODO: Dynamics.v *)
 Lemma subst_many_val g v : 
   subst_many g (tm_val v) = tm_val v.
   induction g.
@@ -129,6 +146,7 @@ Lemma subst_many_val g v :
   apply IHg.
 Qed.
 
+(* TODO: Dynamics.v *)
 Lemma subst_many_tm_bin g e1 e2 : 
   subst_many g (tm_bin e1 e2) = 
     tm_bin (subst_many g e1) (subst_many g e2).
@@ -151,6 +169,7 @@ Lemma subst_many_un : forall g u,
     reflexivity.
 Qed.
 
+(* TODO: Dynamics.v *)
 Lemma subst_many_let : forall g id e b,
     subst_many g (tm_let id e b) = tm_let id (subst_many g e) (subst_many (filter (fun x => negb (String.eqb (fst x) id)) g) b).
   intros g id.
@@ -161,6 +180,7 @@ Lemma subst_many_let : forall g id e b,
       intros e b; apply IHg.
 Qed.
 
+(* TODO: Dynamics.v *)
 Lemma subst_many_var :
   forall (g : smap) (x : string),
     subst_many g (tm_var x) =
@@ -178,6 +198,7 @@ Proof.
     + rewrite <- String.eqb_sym. rewrite Heq. apply IH.
 Qed.
 
+(* TODO: Dynamics.v *)
 Lemma subst_neq_id_commute:
   forall (x s : string) (v n : nat) (e : tm),
     x <> s ->
@@ -209,6 +230,7 @@ Lemma subst_neq_id_commute:
     + simpl; rewrite IHe2; reflexivity.
 Qed.
 
+(* TODO: Dynamics.v *)
 Lemma subst_eq_id_erasure:
   forall (x s : string) (v n : nat) (e : tm),
     x = s ->
@@ -254,10 +276,11 @@ Lemma subst_many_subst_commute:
 Qed.
 
 (* can get rid of next two lemmas; redundant *)
-Lemma subst_rel_after_Pub_update:
+(*
+Lemma subst_rel_after_Pub_update o :
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v : nat),
-    subst_rel Gamma g1 g2 ->
-    subst_rel (update Gamma x Pub)
+    subst_rel o Gamma g1 g2 ->
+    subst_rel o (update Gamma x Pub)
       (update g1 x v)
       (update g2 x v).
   intros.
@@ -274,6 +297,9 @@ Lemma subst_rel_after_Pub_update:
     try rewrite H_g2;
     auto.
 Qed.
+*)
+
+(* ------ Fix here -------- *) 
 
 Lemma subst_rel_after_Sec_update:
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
@@ -340,6 +366,8 @@ Admitted.
 
 *)
 
+(* TODO: make it still work *)
+(* TODO: add the observer label *)
 Theorem noninterference G e t :
   has_type G e t ->
   has_sem_type G e t.
