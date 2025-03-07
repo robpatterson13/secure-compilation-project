@@ -10,8 +10,18 @@ Inductive ty :=
 
 Scheme Equality for ty.
 
-Definition max (t1 : ty) (t2 : ty) : ty.
-  Admitted.
+Definition max (t1 : ty) (t2 : ty) :=
+  match t1, t2 with
+  | Pub, Pub => Pub
+  | Sec, Sec => Sec
+  | Middle, Middle => Middle
+  | Pub, Middle => Middle
+  | Pub, Sec => Sec
+  | Middle, Pub => Middle
+  | Middle, Sec => Sec
+  | Sec, Middle => Sec
+  | Sec, Pub => Sec
+  end.
 (* TODO 1 : new max function *)
 
 (*
@@ -24,18 +34,50 @@ Definition max (t1 : ty) (t2 : ty) : ty.
 *)
 
 (* TODO 2 : define this directly *)
-Definition le (t1 t2 : ty) : bool.
-Admitted.
-
+Definition le (t1 t2 : ty) :=
+match t1, t2 with
+  | Pub, Pub => true
+  | Sec, Sec => true
+  | Middle, Middle => true
+  | Pub, Middle => true
+  | Pub, Sec => true
+  | Middle, Pub => false
+  | Middle, Sec => true
+  | Sec, Middle => false
+  | Sec, Pub => false
+  end.
 (* TODO: prove that le is a partial order *)
 (* - Reflexive *)
 (* - Transitive *)
+
+Lemma le_reflexive (t: ty):
+  le t t = true.
+Proof.
+  destruct t; simpl; reflexivity.
+Qed.
+
+Lemma le_assym (t1 t2 : ty):
+  le t1 t2 = true -> le t2 t1 = true -> t1 = t2.
+Proof.
+intros h1 h2.
+destruct t1; destruct t2; auto; discriminate.
+Qed.
+
+Lemma le_trans (t1 t2 t3: ty) :
+  le t1 t2 = true -> le t2 t3 = true -> le t1 t3 = true.
+Proof.
+intros h1 h2.
+destruct t1; destruct t2; destruct t3; auto.
+Qed.
 
 (* TODO *)
 Lemma le_max_eq (t1 t2 : ty) : 
   le t1 t2 = true ->
   max t1 t2 = t2.
-Admitted.
+Proof.
+intros h1.
+destruct t1; destruct t2; simpl; auto; discriminate.
+Qed.
 
 Definition context : Type := list (string * ty).
 

@@ -61,3 +61,38 @@ Inductive big_eval : tm -> nat -> Prop :=
   big_eval e1 v1 -> 
   big_eval (subst x v1 e2) v2 -> 
   big_eval (tm_let x e1 e2) v2.
+
+  Theorem big_eval_det (t : tm) (v1 v2 : nat) : 
+  big_eval t v1 ->
+  big_eval t v2 ->
+  v1 = v2.
+  intros h1; revert v2.
+  induction h1.
+  {
+    intros v2 h2.
+    inversion h2.
+    reflexivity.
+  }
+  {
+    intros v2 h2.
+    subst.
+    inversion h2; subst.
+    rewrite (IHh1 _ H0).
+    reflexivity.
+  }
+  {
+    intros v3 h3.
+    subst.
+    inversion h3; subst.
+    rewrite (IHh1_2 _ H2).
+    rewrite (IHh1_1 _ H1).
+    reflexivity.
+  }
+  {
+    intros v0 h.
+    inversion h; subst; clear h.
+    specialize (IHh1_1 _ H3); subst.
+    apply IHh1_2.
+    apply H4.
+  }
+Qed.
