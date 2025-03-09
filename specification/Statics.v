@@ -41,10 +41,8 @@ match t1, t2 with
   | Middle, Middle => true
   | Pub, Middle => true
   | Pub, Sec => true
-  | Middle, Pub => false
   | Middle, Sec => true
-  | Sec, Middle => false
-  | Sec, Pub => false
+  | _ , _ => false
   end.
 (* TODO: prove that le is a partial order *)
 (* - Reflexive *)
@@ -70,7 +68,6 @@ intros h1 h2.
 destruct t1; destruct t2; destruct t3; auto.
 Qed.
 
-(* TODO *)
 Lemma le_max_eq (t1 t2 : ty) : 
   le t1 t2 = true ->
   max t1 t2 = t2.
@@ -80,7 +77,6 @@ destruct t1; destruct t2; simpl; auto; discriminate.
 Qed.
 
 Definition context : Type := list (string * ty).
-
 
 Inductive has_type : context -> tm -> ty -> Prop :=
 | T_Var : forall Gamma x t1,
@@ -128,46 +124,6 @@ Definition subst_rel (o : ty) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-
-(* TODO: move this to Dynamics.v *)
-(* 
-Theorem big_eval_det (t : tm) (v1 v2 : nat) : 
-  big_eval t v1 ->
-  big_eval t v2 ->
-  v1 = v2.
-  intros h1; revert v2.
-  induction h1.
-  {
-    intros v2 h2.
-    inversion h2.
-    reflexivity.
-  }
-  {
-    intros v2 h2.
-    subst.
-    inversion h2; subst.
-    rewrite (IHh1 _ H0).
-    reflexivity.
-  }
-  {
-    intros v3 h3.
-    subst.
-    inversion h3; subst.
-    rewrite (IHh1_2 _ H2).
-    rewrite (IHh1_1 _ H1).
-    reflexivity.
-  }
-  {
-    intros v0 h.
-    inversion h; subst; clear h.
-    specialize (IHh1_1 _ H3); subst.
-    apply IHh1_2.
-    apply H4.
-  }
-Qed.    
-*)
-
-
 Definition has_sem_type (o : ty) : context -> tm -> ty -> Prop  :=
   fun Gamma e t =>
     forall g1 g2 v1 v2,
@@ -317,61 +273,64 @@ Lemma subst_many_subst_commute:
     + apply IHg.
 Qed.
 
-(* can get rid of next two lemmas; redundant *)
-(*
-Lemma subst_rel_after_Pub_update o :
-  forall (Gamma : context) (g1 g2 : smap) (x : string) (v : nat),
-    subst_rel o Gamma g1 g2 ->
-    subst_rel o (update Gamma x Pub)
-      (update g1 x v)
-      (update g2 x v).
-  intros.
-  unfold subst_rel.
-  intro. specialize (H x0).
-  destruct (lookup Gamma x0) eqn:H_Gamma in H;
-    destruct (lookup g1 x0) eqn:H_g1 in H;
-    destruct (lookup g2 x0) eqn:H_g2 in H;
-    simpl;
-    destruct (String.eqb x0 x);
-    try apply TR_Pub;
-    try rewrite H_Gamma;
-    try rewrite H_g1;
-    try rewrite H_g2;
-    auto.
-Qed.
-*)
-
 (* ------ Fix here -------- *) 
 
-Lemma subst_rel_after_Sec_update:
-  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
-    subst_rel Gamma g1 g2 ->
-    subst_rel (update Gamma x Sec)
+Lemma subst_rel_update:
+  forall (o t : ty) (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
+    type_rel o t v1 v2 ->
+    subst_rel o Gamma g1 g2 ->
+    subst_rel o (update Gamma x t)
       (update g1 x v1)
       (update g2 x v2).
   intros.
   unfold subst_rel.
-  intro. specialize (H x0).
-  destruct (lookup Gamma x0) eqn:H_Gamma in H;
-    destruct (lookup g1 x0) eqn:H_g1 in H;
-    destruct (lookup g2 x0) eqn:H_g2 in H;
-    simpl;
-    destruct (String.eqb x0 x);
-    try apply TR_Sec;
-    try rewrite H_Gamma;
-    try rewrite H_g1;
-    try rewrite H_g2;
-    auto.
+  intro. 
+  unfold update. 
+  simpl. 
+  destruct (x0 =? x)%string eqn:H_string.
+  {
+    apply H. 
+  }
+  {
+    unfold subst_rel in H0.
+    apply H0.
+  }  
 Qed.
 
 Definition filter_smap (g : smap) (x : string) : smap :=
   filter (fun y => negb (String.eqb (fst y) x)) g.
     
+
+Lemma lookup_filter:
+  forall (g : smap) (x1 x2 : string),
+  (x1 =? x2)%string = false
+  -> lookup(filter_smap g x2) x1 = lookup g x1.
+Proof.
+intros.
+induction g.
+{
+  auto.
+}
+{
+  simpl.
+  destruct a.
+  simpl.
+  destruct (s =? x2)%string.
+  -simpl. destruct (x1 =? s)%string.
+  +
+  +apply IHg.
+  -simpl. destruct (x1 =? s)%string.
+  +auto.
+  +apply IHg.
+}
+  
+
+
 Lemma subst_rel_after_update:
-  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (t : ty),
-    type_rel t v1 v2 ->
-    subst_rel Gamma g1 g2 ->
-    subst_rel (update Gamma x t)
+  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : ty),
+    type_rel o t v1 v2 ->
+    subst_rel o Gamma g1 g2 ->
+    subst_rel o (update Gamma x t)
       (update (filter_smap g1 x) x v1)
       (update (filter_smap g2 x) x v2).
   intros.
@@ -383,7 +342,12 @@ Lemma subst_rel_after_update:
   destruct (lookup Gamma x0) eqn:h'; auto.
   destruct (lookup (filter_smap g1 x) x0) eqn:h''.
   destruct (lookup (filter_smap g2 x) x0) eqn:h'''.
+  specialize(H0 x0).
+  rewrite h' in H0.
   admit.
+  unfold subst_rel in H0.
+  specialize(H0 x0).
+  rewrite h' in H0.
   admit.
   admit.
 Admitted.
