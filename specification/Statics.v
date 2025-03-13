@@ -363,15 +363,40 @@ Lemma subst_rel_after_update:
   rewrite h' in H0.
   -pose proof (lookup_filter g1 x0 x) as h_f1.
    pose proof (lookup_filter g2 x0 x) as h_f2.
-   rewrite h in h_f1; rewrite h in h_f2. simpl in h_f1.
-   (* ALMOST DONE *)
- admit.
-  unfold subst_rel in H0.
+   rewrite h in h_f1; rewrite h in h_f2.
+   specialize (h_f1 eq_refl).
+   specialize (h_f2 eq_refl).
+   rewrite h_f1 in h''.
+   rewrite h_f2 in h'''.
+   rewrite h'' in H0.
+   rewrite h''' in H0.
+   apply H0.
+  -unfold subst_rel in H0.
   specialize(H0 x0).
   rewrite h' in H0.
-  admit.
-  admit.
-Admitted.
+  pose proof (lookup_filter g1 x0 x) as h_f1.
+  pose proof (lookup_filter g2 x0 x) as h_f2.
+  rewrite h in h_f1; rewrite h in h_f2.
+  specialize (h_f1 eq_refl).
+  specialize (h_f2 eq_refl).
+  rewrite h_f1 in h''.
+  rewrite h_f2 in h'''.
+  rewrite h'' in H0.
+  rewrite h''' in H0.
+  apply H0.
+  -unfold subst_rel in H0.
+  specialize(H0 x0).
+  rewrite h' in H0.
+  pose proof (lookup_filter g1 x0 x) as h_f1.
+  pose proof (lookup_filter g2 x0 x) as h_f2.
+  rewrite h in h_f1; rewrite h in h_f2.
+  specialize (h_f1 eq_refl).
+  specialize (h_f2 eq_refl).
+  rewrite h_f1 in h''.
+  rewrite h'' in H0.
+  apply H0.
+Qed.
+
 
 
 (* TODO: write the rest of subst_many lemmas, AFTER looking at the main proof *)
