@@ -1,0 +1,33 @@
+{
+	"files.exclude": {
+		"**/*.aux": true,
+		"**/*.glob": true,
+		"**/*.vo": true,
+		"**/*.vos": true,
+		"**/*.vok": true,
+		"**/*.html": true,
+		"**/.*.report": true,
+		"**/.*.cache": true
+	},
+	"errorLens.enabled": false,
+	"[coq]": {
+		"editor.tabSize": 2,
+		"editor.insertSpaces": true,
+		"editor.suggest.showWords": true,
+		"editor.bracketPairColorization.enabled": false,
+	},
+	"vscoq.proof.mode": 1,
+	"vscoq.proof.block": true,
+	// "vscoq.goals.diff.mode": "on",
+	"vscoq.goals.auto": true,
+	// "vscoq.completion.enable": true,
+	"vscoq.path": "/nix/store/5mkgnv8kxj5ddp3sl3mwv8rw06lpziqy-ocaml5.2.1-vscoq-language-server-2.2.3/bin/vscoqtop",
+	"github.copilot.enable": {
+		"*": false,
+		"*.v": false
+	},
+	"ocaml.sandbox": {
+    "kind": "custom",
+    "template": "direnv exec ${firstWorkspaceFolder} $prog $args"
+  },
+}
