@@ -315,16 +315,33 @@ induction g.
   simpl.
   destruct a.
   simpl.
-  destruct (s =? x2)%string.
-  -simpl. destruct (x1 =? s)%string.
-  +
-  +apply IHg.
-  -simpl. destruct (x1 =? s)%string.
-  +auto.
-  +apply IHg.
+  destruct (s =? x2)%string eqn:H_x2.
+  {
+    
+    destruct (x1 =? x2)%string eqn:H_x1.
+    {
+      discriminate. 
+    }
+    {
+      simpl.
+      apply String.eqb_eq in H_x2. 
+      subst s.
+      rewrite H_x1.
+      apply IHg. 
+    }
+  }
+  {
+    simpl. destruct (x1 =? s)%string eqn:H_x1.
+    {
+     auto. 
+    }
+    {
+      apply IHg. 
+    } 
+  }
 }
+Qed.
   
-
 
 Lemma subst_rel_after_update:
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : ty),
@@ -344,7 +361,11 @@ Lemma subst_rel_after_update:
   destruct (lookup (filter_smap g2 x) x0) eqn:h'''.
   specialize(H0 x0).
   rewrite h' in H0.
-  admit.
+  -pose proof (lookup_filter g1 x0 x) as h_f1.
+   pose proof (lookup_filter g2 x0 x) as h_f2.
+   rewrite h in h_f1; rewrite h in h_f2. simpl in h_f1.
+   (* ALMOST DONE *)
+ admit.
   unfold subst_rel in H0.
   specialize(H0 x0).
   rewrite h' in H0.
