@@ -420,9 +420,9 @@ Qed.
 
 (* TODO: make it still work *)
 (* TODO: add the observer label *)
-Theorem noninterference G e t :
+Theorem noninterference o G e t :
   has_type G e t ->
-  has_sem_type G e t.
+  has_sem_type o G e t.
   intros h.
   induction h.
   {
@@ -445,7 +445,7 @@ Theorem noninterference G e t :
     rewrite subst_many_val in h3.
     inversion h2; subst.
     inversion h3; subst.
-    apply TR_Pub.
+    apply TR_Low.
   }
   {
     unfold has_sem_type.
@@ -456,6 +456,7 @@ Theorem noninterference G e t :
     inversion h3; subst.
 
     destruct (IHh g1 g2 v v0 h1 H0 H1); subst; constructor.
+    apply H.
   }
   {
     unfold has_sem_type.
@@ -467,13 +468,12 @@ Theorem noninterference G e t :
 
     destruct (IHh1 g1 g2 v0 v1 h_sub H1 H3); subst.
     destruct (IHh2 g1 g2 v3 v4 h_sub H2 H4); subst.
-
     - simpl.
       constructor.
     - simpl.
-      constructor.
-    - simpl.
-      destruct t2; constructor.
+      constructor. destruct t; destruct t0; try apply H; unfold max; destruct o; auto.
+    -simpl.
+     constructor. destruct t; destruct t2; try apply H; unfold max; destruct o; try auto.
   }
   {
     unfold has_sem_type.
