@@ -99,7 +99,7 @@ Inductive has_type : context -> tm -> ty -> Prop :=
 
 (*
 Idea: generalize type_rel to have type ty -> ty -> nat -> nat -> Prop.
-
+(pretty much done!)
 First argument: o : "observer label"
     - If t <= o, then type_rel o t v1 v2
     - Otherwise: type_rel o t1 v1 v2 <-> old_type_rel Sec v1 v2
@@ -356,50 +356,29 @@ Lemma subst_rel_after_update:
   simpl.
   destruct (x0 =? x)%string eqn:h.
   auto.
-  destruct (lookup Gamma x0) eqn:h'; auto.
-  destruct (lookup (filter_smap g1 x) x0) eqn:h''.
-  destruct (lookup (filter_smap g2 x) x0) eqn:h'''.
-  specialize(H0 x0).
-  rewrite h' in H0.
-  {
-    pose proof (lookup_filter g1 x0 x) as h_f1.
-    pose proof (lookup_filter g2 x0 x) as h_f2.
-    rewrite h in h_f1; rewrite h in h_f2.
-    specialize (h_f1 eq_refl).
-    specialize (h_f2 eq_refl).
-    rewrite h_f1 in h''.
-    rewrite h_f2 in h'''.
-    rewrite h'' in H0.
+  destruct (lookup Gamma x0) eqn:h'; auto;
+  destruct (lookup (filter_smap g1 x) x0) eqn:h'';
+  destruct (lookup (filter_smap g2 x) x0) eqn:h''';
+  specialize(H0 x0);
+  rewrite h' in H0;
+  unfold subst_rel in H0;
+  pose proof (lookup_filter g1 x0 x) as h_f1;
+  pose proof (lookup_filter g2 x0 x) as h_f2;
+  unfold subst_rel in H0;
+  rewrite h in h_f1; rewrite h in h_f2;
+  specialize (h_f1 eq_refl);
+  specialize (h_f2 eq_refl);
+  rewrite h_f1 in h'';
+  rewrite h_f2 in h''';
+  rewrite h'' in H0;
+  try apply H0.
+  {  
     rewrite h''' in H0.
     apply H0.
   }
   {
-  unfold subst_rel in H0.
-  specialize(H0 x0).
-  rewrite h' in H0.
-  pose proof (lookup_filter g1 x0 x) as h_f1.
-  pose proof (lookup_filter g2 x0 x) as h_f2.
-  rewrite h in h_f1; rewrite h in h_f2.
-  specialize (h_f1 eq_refl).
-  specialize (h_f2 eq_refl).
-  rewrite h_f1 in h''.
-  rewrite h_f2 in h'''.
-  rewrite h'' in H0.
-  rewrite h''' in H0.
-  apply H0.
-  }
-  {
-  unfold subst_rel in H0.
-  specialize(H0 x0).
-  rewrite h' in H0.
-  pose proof (lookup_filter g1 x0 x) as h_f1.
-  pose proof (lookup_filter g2 x0 x) as h_f2.
-  rewrite h in h_f1; rewrite h in h_f2.
-  specialize (h_f1 eq_refl).
-  specialize (h_f2 eq_refl).
-  rewrite h_f1 in h''.
-  rewrite h'' in H0.
-  apply H0.
+    rewrite h''' in H0.
+    apply H0.
   }
 Qed.
 
