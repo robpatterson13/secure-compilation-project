@@ -4,14 +4,19 @@ Import ListNotations.
 Require Import Dynamics.
 Require Import Statics.
 
-Inductive type_rel : ty -> ty -> nat -> nat -> Prop :=
+Section Noninterference.
+  Variable (L : Lattice).
+
+  Definition context : Type := list (string *  (L.(carrier))).
+
+Inductive type_rel : L.(carrier) -> L.(carrier) -> nat -> nat -> Prop :=
   | TR_Low : forall o t v, 
       type_rel o t v v 
   | TR_High : forall o t v1 v2,
-      le t o = false -> 
+      L.(le) t o = false -> 
       type_rel o t v1 v2.
 
-Definition subst_rel (o : ty) : context -> smap -> smap -> Prop :=
+Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
     forall (x : string),
       match lookup G x, lookup g1 x, lookup g2 x with
@@ -20,7 +25,7 @@ Definition subst_rel (o : ty) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-Definition has_sem_type (o : ty) : context -> tm -> ty -> Prop  :=
+Definition has_sem_type (o : L.(carrier)) : context -> tm -> L.(carrier) -> Prop  :=
   fun Gamma e t =>
     forall g1 g2 v1 v2,
       subst_rel o Gamma g1 g2 ->
@@ -29,7 +34,7 @@ Definition has_sem_type (o : ty) : context -> tm -> ty -> Prop  :=
       type_rel o t v1 v2.
 
 Lemma subst_rel_update:
-  forall (o t : ty) (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
+  forall (o t : L.(carrier)) (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
     type_rel o t v1 v2 ->
     subst_rel o Gamma g1 g2 ->
     subst_rel o (update Gamma x t)
@@ -95,7 +100,7 @@ induction g.
 Qed.
 
 Lemma subst_rel_after_update:
-  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : ty),
+  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : L.(carrier)),
     type_rel o t v1 v2 ->
     subst_rel o Gamma g1 g2 ->
     subst_rel o (update Gamma x t)
@@ -133,7 +138,7 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
-Theorem noninterference o G e t :
+Theorem noninterference (o : L.(carrier)) (G : context) (e: tm) (t: L.(carrier)) :
   has_type G e t ->
   has_sem_type o G e t.
   intros h.
