@@ -138,8 +138,8 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
-Theorem noninterference (o : L.(carrier)) (G : context) (e: tm) (t: L.(carrier)) :
-  has_type G e t ->
+Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
+  has_type L G e t ->
   has_sem_type o G e t.
   intros h.
   induction h.
