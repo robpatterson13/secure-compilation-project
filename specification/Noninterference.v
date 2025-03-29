@@ -189,9 +189,42 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
     - simpl.
       constructor.
     - simpl.
-      constructor. destruct t; destruct t0; try apply H; unfold max; destruct o; auto.
+      constructor.
+      specialize(L.(return_max) t t0). intros.
+      destruct H0.
+      {
+       rewrite H0. 
+       specialize(L.(max_le) t0 o t). 
+       intros. 
+       rewrite H in H5. 
+       rewrite H0 in H5. 
+       specialize (H5 eq_refl eq_refl).
+       apply H5. 
+      }
+      {
+       rewrite H0. apply H. 
+      }
+      
     -simpl.
-     constructor. destruct t; destruct t2; try apply H; unfold max; destruct o; try auto.
+     constructor. 
+     specialize(L.(return_max) t t2).
+     intros.
+     destruct H0.
+     {
+      rewrite H0.
+      apply H.
+     }
+     {
+      rewrite H0.
+      specialize(L.(max_le) t o t2).
+      intros. 
+      rewrite H in H5. 
+      specialize (L.(order_max) t2 t); intros.
+      rewrite H6 in H5.
+      rewrite H0 in H5.
+      specialize (H5 eq_refl eq_refl).
+      apply H5.
+     }
   }
   {
     unfold has_sem_type.
@@ -252,3 +285,5 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
     apply H6.
     }
 Qed.
+
+End Noninterference.

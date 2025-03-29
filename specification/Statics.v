@@ -14,10 +14,13 @@ Record Lattice := {
     carrier : Set;
     le : carrier -> carrier -> bool;
     max : carrier -> carrier -> carrier;
+    return_max: forall t1 t2, max t1 t2 = t1 \/ max t1 t2 = t2;
+    order_max: forall t1 t2, max t1 t2 = max t2 t1;
     bot : carrier;
     bot_le : forall x, le bot x = true;
     refl_le : forall t, le t t = true;
-    assym_le : forall t1 t2, le t1 t2 = true -> le t2 t1 = true -> t1 = t2
+    assym_le : forall t1 t2, le t1 t2 = true -> le t2 t1 = true -> t1 = t2;
+    max_le: forall t1 t2 t3, le t1 t2 = false -> max t3 t1 = t3 -> le t3 t2 = false
 }.
 
 Section Types.
@@ -103,14 +106,5 @@ intros h1.
 destruct t1; destruct t2; simpl; auto; discriminate.
 Qed.
 
-Definition base_lattice := {|
-  carrier := ty;
-  le := base_le;
-  max := base_max;
-  bot := Pub;
-  bot_le := base_bot_le;
-  refl_le := base_le_reflexive;
-  assym_le := base_le_assym |}.
-
-  End Types.
+End Types.
     
