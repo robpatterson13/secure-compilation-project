@@ -1,13 +1,29 @@
 Require Import String List.
 Import ListNotations.
 
+Record Lattice := {
+    carrier : Set;
+    le : carrier -> carrier -> bool;
+    max : carrier -> carrier -> carrier;
+    return_max: forall t1 t2, max t1 t2 = t1 \/ max t1 t2 = t2;
+    order_max: forall t1 t2, max t1 t2 = max t2 t1;
+    bot : carrier;
+    bot_le : forall x, le bot x = true;
+    refl_le : forall t, le t t = true;
+    assym_le : forall t1 t2, le t1 t2 = true -> le t2 t1 = true -> t1 = t2;
+    max_le: forall t1 t2 t3, le t1 t2 = false -> max t3 t1 = t3 -> le t3 t2 = false
+}.
+
+Section LatticeSection.
+  Variable (L : Lattice).
+
 Inductive tm : Type :=
 | tm_var : string -> tm
 | tm_val : nat -> tm
 | tm_bin : tm -> tm -> tm
 | tm_un : tm -> tm
-| tm_let : string -> tm -> tm -> tm.
-
+| tm_let : string -> tm -> tm -> tm
+| tm_declass : tm -> L.(carrier) -> tm.
 
 Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   match t with
@@ -18,9 +34,12 @@ Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   | tm_let x_b e b =>
       let body := if String.eqb x x_b then b else (subst x s b) in
       tm_let x_b (subst x s e) body
+  | tm_declass t l => tm_declass (subst x s t) l
   end.
 
 Definition smap : Type := list (string * nat).
+
+Definition trace : Type := list nat.
 
 Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
   match bindings with
@@ -42,58 +61,66 @@ Fixpoint lookup {A} (m : list (string * A)) (x : string) : option A :=
       else lookup m' x
   end.
 
-
 Axiom f_un : nat -> nat.
 Axiom f_bin : nat -> nat -> nat.
 
-Inductive big_eval : tm -> nat -> Prop := 
-| Etm_val : forall v,
-  big_eval (tm_val v) v
-| Etm_un : forall e v v',
-  big_eval e v -> v' = f_un v -> 
-  big_eval (tm_un e) v'
-| Etm_bin : forall e1 e2 v1 v2 v,
-  big_eval e1 v1 -> 
-  big_eval e2 v2 -> 
+Inductive big_eval : tm -> nat -> trace -> Prop := 
+| Etm_val : forall v tr,
+  big_eval (tm_val v) v tr
+| Etm_un : forall e v v' tr,
+  big_eval e v tr -> v' = f_un v -> 
+  big_eval (tm_un e) v' tr
+| Etm_bin : forall e1 e2 v1 v2 v tr1 tr2,
+  big_eval e1 v1 tr1 -> 
+  big_eval e2 v2 tr2 -> 
   v = f_bin v1 v2 -> 
-  big_eval (tm_bin e1 e2) v
-| Etm_let : forall x e1 e2 v1 v2,
-  big_eval e1 v1 -> 
-  big_eval (subst x v1 e2) v2 -> 
-  big_eval (tm_let x e1 e2) v2.
+  big_eval (tm_bin e1 e2) v (tr1 ++ tr2)
+| Etm_let : forall x e1 e2 v1 v2 tr1 tr2,
+  big_eval e1 v1 tr1 -> 
+  big_eval (subst x v1 e2) v2 tr2 -> 
+  big_eval (tm_let x e1 e2) v2 (tr1 ++ tr2)
+| Etm_declass : forall e v tr L,
+  big_eval e v tr ->
+  big_eval (tm_declass e L) v (v :: tr). 
 
-  Theorem big_eval_det (t : tm) (v1 v2 : nat) : 
-  big_eval t v1 ->
-  big_eval t v2 ->
+  Theorem big_eval_det (t : tm) (v1 v2 : nat) (tr1 tr2 : trace) : 
+  big_eval t v1 tr1 ->
+  big_eval t v2 tr2 ->
   v1 = v2.
-  intros h1; revert v2.
+  intros h1; revert v2 tr2.
   induction h1.
   {
-    intros v2 h2.
+    intros v2 tr2 h2.
     inversion h2.
     reflexivity.
   }
   {
-    intros v2 h2.
+    intros v2 tr2 h2.
     subst.
     inversion h2; subst.
-    rewrite (IHh1 _ H0).
+    rewrite (IHh1 _ _ H0).
     reflexivity.
   }
   {
-    intros v3 h3.
+    intros v3 tr3 h3.
     subst.
     inversion h3; subst.
-    rewrite (IHh1_2 _ H2).
-    rewrite (IHh1_1 _ H1).
+    rewrite (IHh1_2 _ _ H2).
+    rewrite (IHh1_1 _ _ H1).
     reflexivity.
   }
   {
-    intros v0 h.
+    intros v0 tr0 h.
     inversion h; subst; clear h.
-    specialize (IHh1_1 _ H3); subst.
+    specialize (IHh1_1 _ _ H4); subst.
+    specialize (IHh1_2 _ _ H5).
     apply IHh1_2.
-    apply H4.
+  }
+  {
+    intros v2 tr2 h2.
+    inversion h2; subst.
+    specialize (IHh1 _ _ H3); subst.
+    reflexivity.
   }
 Qed.
 
@@ -174,6 +201,7 @@ Lemma subst_eq_id_erasure:
     destruct (String.eqb s s0); simpl.
     + reflexivity.
     + rewrite IHe2; reflexivity.
+  - rewrite IHe. reflexivity.
 Qed.
 
 Lemma id_neq_sym:
@@ -214,6 +242,7 @@ Lemma subst_neq_id_commute:
   - simpl; rewrite IHe1.
     destruct (String.eqb x s0); destruct (String.eqb s s0); subst; try reflexivity.
     + simpl; rewrite IHe2; reflexivity.
+  -simpl. rewrite IHe. reflexivity.
 Qed.
 
 Lemma subst_many_subst_commute:
@@ -231,3 +260,5 @@ Lemma subst_many_subst_commute:
       reflexivity.
     + apply IHg.
 Qed.
+
+End LatticeSection.

@@ -10,41 +10,30 @@ Inductive ty :=
 
 Scheme Equality for ty.
 
-Record Lattice := {
-    carrier : Set;
-    le : carrier -> carrier -> bool;
-    max : carrier -> carrier -> carrier;
-    return_max: forall t1 t2, max t1 t2 = t1 \/ max t1 t2 = t2;
-    order_max: forall t1 t2, max t1 t2 = max t2 t1;
-    bot : carrier;
-    bot_le : forall x, le bot x = true;
-    refl_le : forall t, le t t = true;
-    assym_le : forall t1 t2, le t1 t2 = true -> le t2 t1 = true -> t1 = t2;
-    max_le: forall t1 t2 t3, le t1 t2 = false -> max t3 t1 = t3 -> le t3 t2 = false
-}.
-
 Section Types.
   Variable (L : Lattice).
 
 Definition context : Type := list (string *  (L.(carrier))). 
 
-Inductive has_type : context -> tm -> L.(carrier) -> Prop :=
+Inductive has_type : context -> tm L -> L.(carrier) -> Prop :=
 | T_Var : forall Gamma x t1,
     lookup Gamma x = Some t1 ->
-    has_type Gamma (tm_var x) t1
+    has_type Gamma (tm_var L x) t1
 | T_Val : forall Gamma v,
-    has_type Gamma (tm_val v) L.(bot)
+    has_type Gamma (tm_val L v) L.(bot)
 | T_Un : forall Gamma e t,
     has_type Gamma e t ->
-    has_type Gamma (tm_un e) t
+    has_type Gamma (tm_un L e) t
 | T_Bin : forall Gamma e1 e2 t1 t2,
     has_type Gamma e1 t1 ->
     has_type Gamma e2 t2 ->
-    has_type Gamma (tm_bin e1 e2) (L.(max) t1 t2)
+    has_type Gamma (tm_bin L e1 e2) (L.(max) t1 t2)
 | T_Let : forall Gamma e1 e2 x t1 t2,
     has_type Gamma e1 t1 ->
     has_type (update Gamma x t1) e2 t2 ->
-    has_type Gamma (tm_let x e1 e2) t2.
+    has_type Gamma (tm_let L x e1 e2) t2
+| T_Declass : forall Gamma e Label,
+    has_type Gamma (tm_declass L e Label) Label.
 
 
 Definition base_max (t1 : ty) (t2 : ty) :=

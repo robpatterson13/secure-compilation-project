@@ -25,12 +25,12 @@ Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-Definition has_sem_type (o : L.(carrier)) : context -> tm -> L.(carrier) -> Prop  :=
+Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Prop  :=
   fun Gamma e t =>
-    forall g1 g2 v1 v2,
+    forall g1 g2 v1 v2 tr1 tr2,
       subst_rel o Gamma g1 g2 ->
-      big_eval (subst_many g1 e) v1 ->
-      big_eval (subst_many g2 e) v2 ->
+      big_eval L (subst_many L g1 e) v1 tr1 ->
+      big_eval L (subst_many L g2 e) v2 tr2 ->
       type_rel o t v1 v2.
 
 Lemma subst_rel_update:
@@ -138,19 +138,19 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
-Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
+Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) :
   has_type L G e t ->
   has_sem_type o G e t.
   intros h.
   induction h.
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 h1 Hv1 Hv2.
+    intros g1 g2 v1 v2 tr1 tr2 h1 Hv1 Hv2.
     specialize (h1 x).
     destruct (lookup g1 x) eqn:E1; [ | (rewrite H in h1; contradiction) ].
     destruct (lookup g2 x) eqn:E2; [ | (rewrite H in h1; contradiction) ].
-    rewrite (subst_many_var g1 x) in Hv1; rewrite E1 in Hv1; simpl in Hv1.
-    rewrite (subst_many_var g2 x) in Hv2; rewrite E2 in Hv2; simpl in Hv2.
+    rewrite (subst_many_var L g1 x) in Hv1; rewrite E1 in Hv1; simpl in Hv1.
+    rewrite (subst_many_var L g2 x) in Hv2; rewrite E2 in Hv2; simpl in Hv2.
     inversion Hv1; subst.
     inversion Hv2; subst.
     rewrite H in h1.
@@ -158,7 +158,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 h1 h2 h3.
+    intros g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
     rewrite subst_many_val in h2.
     rewrite subst_many_val in h3.
     inversion h2; subst.
@@ -167,25 +167,25 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 h1 h2 h3.
+    intros g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
     rewrite subst_many_un in h2.
     rewrite subst_many_un in h3.
     inversion h2; subst.
     inversion h3; subst.
 
-    destruct (IHh g1 g2 v v0 h1 H0 H1); subst; constructor.
+    destruct (IHh g1 g2 v v0 tr1 tr2 h1 H0 H1); subst; constructor.
     apply H.
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+    intros g1 g2 v1 v2 tr1 tr2 h_sub h_eval1 h_eval2.
     rewrite subst_many_tm_bin in h_eval1.
     rewrite subst_many_tm_bin in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
 
-    destruct (IHh1 g1 g2 v0 v1 h_sub H1 H3); subst.
-    destruct (IHh2 g1 g2 v3 v4 h_sub H2 H4); subst.
+    destruct (IHh1 g1 g2 v0 v1 tr0 tr1 h_sub H1 H3); subst.
+    destruct (IHh2 g1 g2 v3 v4 tr3 tr4 h_sub H2 H4); subst.
     - simpl.
       constructor.
     - simpl.
@@ -228,7 +228,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+    intros g1 g2 v1 v2 tr1 tr2 h_sub h_eval1 h_eval2.
     rewrite subst_many_let in h_eval1.
     rewrite subst_many_let in h_eval2.
     inversion h_eval1; subst.
@@ -241,25 +241,25 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm) :
        arbitrary gammas without x *)        
     assert (H_pull_out_inner_subst : forall x v s n e g,
                x <> s ->
-               (subst_many (filter (fun y => negb (String.eqb (fst y) x)) g) (subst s n (subst x v e)))
-               = (subst x v (subst_many (filter (fun y => negb (String.eqb (fst y) x)) g) (subst s n e)))). {
+               (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n (subst L x v e)))
+               = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n e)))). {
       intros.
       induction g; simpl.
-      - apply (subst_neq_id_commute x0 s v n e).
+      - apply (subst_neq_id_commute L x0 s v n e).
         exact H.
       - destruct a; simpl; destruct (String.eqb s0 x0) eqn:H_s0_x0; simpl.
         + apply IHg.
-        + rewrite (subst_neq_id_commute x0 s v n e).
-          rewrite (subst_neq_id_commute x0 s0 v n0 (subst s n e)).
-          apply (subst_many_subst_commute x0 v g (subst s0 n0 (subst s n e))).
+        + rewrite (subst_neq_id_commute L x0 s v n e).
+          rewrite (subst_neq_id_commute L x0 s0 v n0 (subst L s n e)).
+          apply (subst_many_subst_commute L x0 v g (subst L s0 n0 (subst L s n e))).
           apply String.eqb_neq in H_s0_x0.
           apply id_neq_sym in H_s0_x0; exact H_s0_x0.
           exact H.
     }
     
     assert (H_update_subst_equiv : forall g v e,
-               (subst_many (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e)
-               = (subst x v (subst_many (filter (fun y => negb (String.eqb (fst y) x)) g) e))). {
+               (subst_many L (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e)
+               = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) e))). {
       simpl.
       induction g; simpl.
       - reflexivity.
