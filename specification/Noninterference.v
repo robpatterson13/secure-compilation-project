@@ -274,16 +274,25 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) :
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
     
     unfold has_sem_type in IHh1.
-    apply IHh2.
+    apply (IHh2 tr3 tr4).
     apply subst_rel_after_update.
     eapply IHh1.
     apply h_sub.
-    apply H3.
-    apply H5.
-    apply h_sub.
     apply H4.
     apply H6.
+    apply h_sub.
+    apply H5.
+    apply H7.
     }
-Qed.
+    {
+      unfold has_sem_type.
+      intros g1 g2 v1 v2 tr1 tr2 h_sub h_eval1 h_eval2.
+      rewrite subst_many_declass in h_eval1.
+      rewrite subst_many_declass in h_eval2.
+      inversion h_eval1; subst.
+      inversion h_eval2; subst.
+      
+    }
+Admitted.
 
 End Noninterference.

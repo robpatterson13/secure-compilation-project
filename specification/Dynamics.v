@@ -39,7 +39,7 @@ Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
 
 Definition smap : Type := list (string * nat).
 
-Definition trace : Type := list nat.
+Definition trace : Type := list (nat * L.(carrier)).
 
 Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
   match bindings with
@@ -81,7 +81,7 @@ Inductive big_eval : tm -> nat -> trace -> Prop :=
   big_eval (tm_let x e1 e2) v2 (tr1 ++ tr2)
 | Etm_declass : forall e v tr L,
   big_eval e v tr ->
-  big_eval (tm_declass e L) v (v :: tr). 
+  big_eval (tm_declass e L) v ((v, L) :: tr). 
 
   Theorem big_eval_det (t : tm) (v1 v2 : nat) (tr1 tr2 : trace) : 
   big_eval t v1 tr1 ->
@@ -166,6 +166,17 @@ Lemma subst_many_let : forall g id e b,
     destruct (String.eqb s id); simpl;
       intros e b; apply IHg.
 Qed.
+
+Lemma subst_many_declass: forall g t l,
+  subst_many g (tm_declass t l) = tm_declass (subst_many g t) l.
+  intros g.
+  induction g; simpl.
+  -intros t l. reflexivity.
+  -intros t l. destruct a.
+   rewrite IHg.
+   reflexivity.
+Qed.
+  
 
 Lemma subst_many_var :
   forall (g : smap) (x : string),
