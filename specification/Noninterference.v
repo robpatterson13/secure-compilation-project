@@ -25,8 +25,8 @@ Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Prop  :=
-  fun Gamma e t =>
+Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> trace L -> trace L -> Prop  :=
+  fun Gamma e t tr1 tr2 =>
     forall g1 g2 v1 v2 tr1 tr2,
       subst_rel o Gamma g1 g2 ->
       big_eval L (subst_many L g1 e) v1 tr1 ->
@@ -138,14 +138,16 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
-Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) :
+Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L) :
   has_type L G e t ->
-  has_sem_type o G e t.
+  tr1 = [] ->
+  tr2 = [] ->
+  has_sem_type o G e t tr1 tr2.
   intros h.
   induction h.
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 tr1 tr2 h1 Hv1 Hv2.
+    intros _ _ g1 g2 v1 v2 tr_1 tr_2 h1 Hv1 Hv2.
     specialize (h1 x).
     destruct (lookup g1 x) eqn:E1; [ | (rewrite H in h1; contradiction) ].
     destruct (lookup g2 x) eqn:E2; [ | (rewrite H in h1; contradiction) ].
@@ -158,7 +160,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) :
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
+    intros _ _ g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
     rewrite subst_many_val in h2.
     rewrite subst_many_val in h3.
     inversion h2; subst.
@@ -167,13 +169,13 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) :
   }
   {
     unfold has_sem_type.
-    intros g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
+    intros htr1 htr2 g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
     rewrite subst_many_un in h2.
     rewrite subst_many_un in h3.
     inversion h2; subst.
     inversion h3; subst.
 
-    destruct (IHh g1 g2 v v0 tr1 tr2 h1 H0 H1); subst; constructor.
+    destruct (IHh g1 g2 v v0 tr1 tr2 h1 H0 H1); subst.
     apply H.
   }
   {
