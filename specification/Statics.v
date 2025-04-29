@@ -32,7 +32,8 @@ Inductive has_type : context -> tm L -> L.(carrier) -> Prop :=
     has_type Gamma e1 t1 ->
     has_type (update Gamma x t1) e2 t2 ->
     has_type Gamma (tm_let L x e1 e2) t2
-| T_Declass : forall Gamma e Label,
+| T_Declass : forall Gamma e t Label,
+    has_type Gamma e t ->
     has_type Gamma (tm_declass L e Label) Label.
 
 
