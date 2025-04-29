@@ -188,12 +188,25 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     inversion h_eval2; subst.
     specialize (IHh1 eq_refl eq_refl).
     specialize (IHh2 eq_refl eq_refl).
-    assert (trace_empty : forall tr1 tr2, tr1 ++ tr2 = [] -> tr1 = []). {
+    assert (Trace_Empt : forall (tr1 tr2: trace L), tr1 ++ tr2 = [] -> tr1 = [] /\ tr2 = []). {
+      intros tr_1 tr_2 H.
+      induction tr_1 as [| x tr1' IH].
+      -simpl in H. split; auto.
+      -simpl in H. discriminate.
+    }
+    apply Trace_Empt in H4.
+    apply Trace_Empt in H3.
+    destruct H3 as [Htr1 Htr2].
+    destruct H4 as [Htr3 Htr4].
+    rewrite Htr3 in H1.
+    rewrite Htr1 in H5.
+    rewrite Htr2 in H7.
+    rewrite Htr4 in H2.
+    
+    
 
-    } 
-
-    destruct (IHh1 g1 g2 v0 v1 h_sub H1 H3); subst.
-    destruct (IHh2 g1 g2 v3 v4 tr3 tr2 h_sub H2 H4); subst.
+    destruct (IHh1 g1 g2 v0 v1 h_sub H1 H5); subst.
+    destruct (IHh2 g1 g2 v3 v4 h_sub H2 H7); subst.
     - simpl.
       constructor.
     - simpl.
@@ -204,10 +217,10 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
        rewrite H0. 
        specialize(L.(max_le) t0 o t). 
        intros. 
-       rewrite H in H5. 
-       rewrite H0 in H5. 
-       specialize (H5 eq_refl eq_refl).
-       apply H5. 
+       rewrite H in H3. 
+       rewrite H0 in H3. 
+       specialize (H3 eq_refl eq_refl).
+       apply H3. 
       }
       {
        rewrite H0. apply H. 
@@ -226,17 +239,17 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       rewrite H0.
       specialize(L.(max_le) t o t2).
       intros. 
-      rewrite H in H5. 
+      rewrite H in H3. 
       specialize (L.(order_max) t2 t); intros.
-      rewrite H6 in H5.
-      rewrite H0 in H5.
-      specialize (H5 eq_refl eq_refl).
-      apply H5.
+      rewrite H4 in H3.
+      rewrite H0 in H3.
+      specialize (H3 eq_refl eq_refl).
+      apply H3.
      }
   }
   {
     unfold has_sem_type.
-    intros htr1 htr2 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
+    intros htr1 htr2 g1 g2 v1 v2 h_sub h_eval1 h_eval2.
     rewrite subst_many_let in h_eval1.
     rewrite subst_many_let in h_eval2.
     inversion h_eval1; subst.
@@ -279,33 +292,46 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
           intros v e; specialize (H_pull_out_inner_subst x v s n e g); auto.
         + apply IHg.
     }
-    
+    assert (Trace_Empt : forall (tr1 tr2: trace L), tr1 ++ tr2 = [] -> tr1 = [] /\ tr2 = []). {
+      intros tr_1 tr_2 H.
+      induction tr_1 as [| x' tr1' IH].
+      -simpl in H. split; auto.
+      -simpl in H. discriminate.
+    }
     rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
     
     unfold has_sem_type in IHh1.
-    apply (IHh2 tr3 tr2).
+    apply IHh2.
     apply subst_rel_after_update.
     eapply IHh1.
     apply h_sub.
+    apply Trace_Empt in H3;
+    destruct H3 as [Htr1 Htr2];
+    rewrite Htr1 in H4;
     apply H4.
+    apply Trace_Empt in H7;
+    destruct H7 as [Htr1 Htr2];
+    rewrite Htr1 in H6;
     apply H6.
     apply h_sub.
+    apply Trace_Empt in H3;
+    destruct H3 as [Htr1 Htr2];
+    rewrite Htr2 in H5;
     apply H5.
-    apply H7.
+    apply Trace_Empt in H7;
+    destruct H7 as [Htr1 Htr2];
+    rewrite Htr2 in H8;
+    apply H8.
     }
     {
       unfold has_sem_type.
-      intros htr1 htr2 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
+      intros htr1 htr2 g1 g2 v1 v2 h_sub h_eval1 h_eval2.
       rewrite subst_many_declass in h_eval1.
       rewrite subst_many_declass in h_eval2.
-      inversion h_eval1; subst.
-      inversion h_eval2; subst.
-      
-      
-
-      
+      inversion h_eval1; subst. 
+      discriminate.
     }
-Admitted.
+Qed.
 
 End Noninterference.
