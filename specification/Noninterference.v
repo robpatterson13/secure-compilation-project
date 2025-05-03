@@ -16,6 +16,18 @@ Inductive type_rel : L.(carrier) -> L.(carrier) -> nat -> nat -> Prop :=
       L.(le) t o = false -> 
       type_rel o t v1 v2.
 
+Inductive trace_rel :  trace L -> trace L -> Prop :=
+  | Decl_Empty : forall tr1 tr2,
+    tr1 = [] ->
+    tr2 = [] ->
+    trace_rel tr1 tr2
+  | Decl_Rest : forall (l1 l2 o: L.(carrier)) v1 v2 (tr1 tr2 : trace L),
+    trace_rel tr1 tr2 ->
+    L.(le) l1 o = true \/
+    L.(le) l2 o = true ->
+    v1 = v2 -> 
+    trace_rel ((v1, l1)::tr1) ((v2, l2)::tr2). 
+
 Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
     forall (x : string),
@@ -25,9 +37,9 @@ Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> trace L -> trace L -> Prop  :=
-  fun Gamma e t tr1 tr2 =>
-    forall g1 g2 v1 v2,
+Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Prop  :=
+  fun Gamma e t =>
+    forall g1 g2 v1 v2 tr1 tr2,
       subst_rel o Gamma g1 g2 ->
       big_eval L (subst_many L g1 e) v1 tr1 ->
       big_eval L (subst_many L g2 e) v2 tr2 ->
@@ -138,16 +150,15 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
-Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L) :
+Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L):
   has_type L G e t ->
-  tr1 = [] ->
-  tr2 = [] ->
-  has_sem_type o G e t tr1 tr2.
+  trace_rel tr1 tr2 ->
+  has_sem_type o G e t.
   intros h.
   induction h.
   {
     unfold has_sem_type.
-    intros _ _ g1 g2 v1 v2 h1 Hv1 Hv2.
+    intros _ g1 g2 v1 v2 tr_1 tr_2 h1 Hv1 Hv2.
     specialize (h1 x).
     destruct (lookup g1 x) eqn:E1; [ | (rewrite H in h1; contradiction) ].
     destruct (lookup g2 x) eqn:E2; [ | (rewrite H in h1; contradiction) ].
@@ -160,7 +171,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
   }
   {
     unfold has_sem_type.
-    intros _ _ g1 g2 v1 v2 h1 h2 h3.
+    intros _ g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
     rewrite subst_many_val in h2.
     rewrite subst_many_val in h3.
     inversion h2; subst.
@@ -169,44 +180,28 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
   }
   {
     unfold has_sem_type.
-    intros htr1 htr2 g1 g2 v1 v2 h1 h2 h3.
+    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
     rewrite subst_many_un in h2.
     rewrite subst_many_un in h3.
     inversion h2; subst.
     inversion h3; subst.
-    specialize (IHh eq_refl eq_refl).
+    specialize (IHh htr1).
 
-    destruct (IHh g1 g2 v v0 h1 H0 H1); subst; constructor.
+    destruct (IHh g1 g2 v v0 tr_1 tr_2 h1 H0 H1); subst; constructor.
     apply H.
   }
   {
     unfold has_sem_type.
-    intros htr1 htr2 g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
     rewrite subst_many_tm_bin in h_eval1.
     rewrite subst_many_tm_bin in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    specialize (IHh1 eq_refl eq_refl).
-    specialize (IHh2 eq_refl eq_refl).
-    assert (Trace_Empt : forall (tr1 tr2: trace L), tr1 ++ tr2 = [] -> tr1 = [] /\ tr2 = []). {
-      intros tr_1 tr_2 H.
-      induction tr_1 as [| x tr1' IH].
-      -simpl in H. split; auto.
-      -simpl in H. discriminate.
-    }
-    apply Trace_Empt in H4.
-    apply Trace_Empt in H3.
-    destruct H3 as [Htr1 Htr2].
-    destruct H4 as [Htr3 Htr4].
-    rewrite Htr3 in H1.
-    rewrite Htr1 in H5.
-    rewrite Htr2 in H7.
-    rewrite Htr4 in H2.
+    specialize (IHh1 htr1).
+    specialize (IHh2 htr1).
     
-    
-
-    destruct (IHh1 g1 g2 v0 v1 h_sub H1 H5); subst.
-    destruct (IHh2 g1 g2 v3 v4 h_sub H2 H7); subst.
+    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub H1 H3); subst.
+    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub H2 H4); subst.
     - simpl.
       constructor.
     - simpl.
@@ -217,10 +212,10 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
        rewrite H0. 
        specialize(L.(max_le) t0 o t). 
        intros. 
-       rewrite H in H3. 
-       rewrite H0 in H3. 
-       specialize (H3 eq_refl eq_refl).
-       apply H3. 
+       rewrite H in H5. 
+       rewrite H0 in H5. 
+       specialize (H5 eq_refl eq_refl).
+       apply H5. 
       }
       {
        rewrite H0. apply H. 
@@ -239,26 +234,26 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       rewrite H0.
       specialize(L.(max_le) t o t2).
       intros. 
-      rewrite H in H3. 
+      rewrite H in H5. 
       specialize (L.(order_max) t2 t); intros.
-      rewrite H4 in H3.
-      rewrite H0 in H3.
-      specialize (H3 eq_refl eq_refl).
-      apply H3.
+      rewrite H6 in H5.
+      rewrite H0 in H5.
+      specialize (H5 eq_refl eq_refl).
+      apply H5.
      }
   }
   {
     unfold has_sem_type.
-    intros htr1 htr2 g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
     rewrite subst_many_let in h_eval1.
     rewrite subst_many_let in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    specialize (IHh1 eq_refl eq_refl).
-    specialize (IHh2 eq_refl eq_refl).
+    specialize (IHh1 htr1).
+    specialize (IHh2 htr1).
 
     unfold has_sem_type in IHh2.
-    specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2).  
+    specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2 tr3 tr5).  
             
     (* want to generalize following assertions as lemmas over
        arbitrary gammas without x *)        
@@ -306,31 +301,19 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     apply subst_rel_after_update.
     eapply IHh1.
     apply h_sub.
-    apply Trace_Empt in H3;
-    destruct H3 as [Htr1 Htr2];
-    rewrite Htr1 in H4;
-    apply H4.
-    apply Trace_Empt in H7;
-    destruct H7 as [Htr1 Htr2];
-    rewrite Htr1 in H6;
-    apply H6.
-    apply h_sub.
-    apply Trace_Empt in H3;
-    destruct H3 as [Htr1 Htr2];
-    rewrite Htr2 in H5;
-    apply H5.
-    apply Trace_Empt in H7;
-    destruct H7 as [Htr1 Htr2];
-    rewrite Htr2 in H8;
-    apply H8.
+    -apply H4.
+    -apply H6.
+    -apply h_sub.
+    -apply H5.
+    -apply H7.
     }
     {
       unfold has_sem_type.
-      intros htr1 htr2 g1 g2 v1 v2 h_sub h_eval1 h_eval2.
+      intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
       rewrite subst_many_declass in h_eval1.
       rewrite subst_many_declass in h_eval2.
       inversion h_eval1; subst. 
-      discriminate.
+      admit.
     }
 Qed.
 
