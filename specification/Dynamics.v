@@ -65,8 +65,8 @@ Axiom f_un : nat -> nat.
 Axiom f_bin : nat -> nat -> nat.
 
 Inductive big_eval : tm -> nat -> trace -> Prop := 
-| Etm_val : forall v tr,
-  big_eval (tm_val v) v tr
+| Etm_val : forall v,
+  big_eval (tm_val v) v []
 | Etm_un : forall e v v' tr,
   big_eval e v tr -> v' = f_un v -> 
   big_eval (tm_un e) v' tr

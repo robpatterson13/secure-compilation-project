@@ -15,24 +15,84 @@ Inductive type_rel : L.(carrier) -> L.(carrier) -> nat -> nat -> Prop :=
   | TR_High : forall o t v1 v2,
       L.(le) t o = false -> 
       type_rel o t v1 v2.
+      
+Inductive smap_shape_rel : smap -> smap -> Prop :=
+  | SMap_Empty : smap_shape_rel [] []
+  | SMap_Cons : forall x n1 n2 g1 g2,
+    smap_shape_rel g1 g2 ->
+    smap_shape_rel ((x, n1) :: g1) ((x, n2) :: g2).
 
-Inductive trace_rel :  trace L -> trace L -> Prop :=
-  | Decl_Empty : forall tr1 tr2,
-    tr1 = [] ->
-    tr2 = [] ->
-    trace_rel tr1 tr2
-  | Decl_Rest : forall (l1 l2 o: L.(carrier)) v1 v2 (tr1 tr2 : trace L),
-    trace_rel tr1 tr2 ->
+Inductive shape_rel : tm L -> tm L -> Prop :=
+  | SR_Var : forall x, 
+      shape_rel (tm_var L x) (tm_var L x)
+  | SR_Var_Val : forall x, 
+      shape_rel (tm_var L x) (tm_var L x)
+  | SR_Val : forall v1 v2,
+      shape_rel (tm_val L v1) (tm_val L v2)
+  | SR_Un : forall e1 e2,
+      shape_rel e1 e2 ->
+      shape_rel (tm_un L e1) (tm_un L e2)
+  | SR_Bin : forall e1 e2 e3 e4,
+      shape_rel e1 e3 ->
+      shape_rel e2 e4 ->
+      shape_rel (tm_bin L e1 e2) (tm_bin L e3 e4)
+  | SR_Let : forall e1 e2 e3 e4 x,
+      shape_rel e1 e3 ->
+      shape_rel e2 e4 ->
+      shape_rel (tm_let L x e1 e2) (tm_let L x e3 e4)
+  | SR_Declass : forall e1 e2 Label,
+      shape_rel e1 e2 ->
+      shape_rel (tm_declass L e1 Label) (tm_declass L e2 Label).
+
+      
+Inductive trace_rel :  L.(carrier) -> trace L -> trace L -> Prop :=
+| Decl_Pub : forall (l1 l2 o: L.(carrier)) v1 v2 (tr1 tr2 : trace L),
+    trace_rel o tr1 tr2 ->
     L.(le) l1 o = true \/
-    L.(le) l2 o = true ->
-    v1 = v2 -> 
-    trace_rel ((v1, l1)::tr1) ((v2, l2)::tr2). 
+    L.(le) l2 o = true -> 
+    v1 = v2 ->
+    trace_rel o ((v1, l1)::tr1) ((v2, l2)::tr2)
+| Decl_Sec : forall (l1 l2 o: L.(carrier)) v1 v2 (tr1 tr2 : trace L),
+    trace_rel o tr1 tr2 ->
+    L.(le) l1 o = false /\
+    L.(le) l2 o = false -> 
+    trace_rel o ((v1, l1)::tr1) ((v2, l2)::tr2)
+| Decl_Empty : forall o tr1 tr2,
+  tr1 = [] ->
+  tr2 = [] ->
+  trace_rel o tr1 tr2. 
+
+Lemma subst_same_shape : 
+  forall g1 g2 e,
+  smap_shape_rel g1 g2 ->
+  shape_rel (subst_many L g1 e) (subst_many L g2 e).
+Proof.
+  intros g1 g2 e. 
+  induction e.
+  - rewrite subst_many_var.
+    rewrite subst_many_var.
+    induction lookup.
+  - rewrite subst_many_val.
+    rewrite subst_many_val.
+    constructor.
+  - rewrite subst_many_tm_bin. 
+    rewrite subst_many_tm_bin.
+    constructor. 
+    apply IHe1. apply H. 
+    apply IHe2. apply H.
+  - rewrite subst_many_un.
+    rewrite subst_many_un.
+    constructor.
+    apply IHe.
+  - rewrite subst_many_let.
+    rewrite subst_many_let.
+    constructor.        
 
 Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
     forall (x : string),
       match lookup G x, lookup g1 x, lookup g2 x with
-        | None, _, _ => True
+        | None, _, _ => True 
         | Some t, Some v1, Some v2 => 
             type_rel o t v1 v2
         | Some t, _, _ => False end.
@@ -41,6 +101,7 @@ Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Pr
   fun Gamma e t =>
     forall g1 g2 v1 v2 tr1 tr2,
       subst_rel o Gamma g1 g2 ->
+      trace_rel o tr1 tr2 ->
       big_eval L (subst_many L g1 e) v1 tr1 ->
       big_eval L (subst_many L g2 e) v2 tr2 ->
       type_rel o t v1 v2.
@@ -150,15 +211,74 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
+Lemma big_eval_trace :
+   forall e g1 g2 v1 v2 tr1 tr2,
+   big_eval L (subst_many L g1 e) v1 tr1 ->
+   big_eval L (subst_many L g2 e) v2 tr2 ->
+   shape_rel (subst_many L g1 e) (subst_many L g2 e) ->
+   length tr1 = length tr2.
+Proof.
+  intros e g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
+  induction h1.
+  -inversion h3.
+Admitted.
+
+
+
+Lemma tm_val_trace :
+  forall g1 g2 v v1 v2 tr1 tr2,
+    big_eval L (subst_many L g1 (tm_val L v)) v1 tr1 ->
+    big_eval L (subst_many L g2 (tm_val L v)) v2 tr2 ->
+    length tr1 = length tr2.
+Proof.
+  intros g1 g2 v v1 v2 tr1 tr2 h1 h2.
+  rewrite subst_many_val in h1. 
+  rewrite subst_many_val in h2. 
+  inversion h1; subst.
+  inversion h2; subst.
+  reflexivity.
+Qed.
+
+Lemma tm_un_trace :
+  forall g1 g2 e v1 v2 tr1 tr2,
+    big_eval L (subst_many L g1 (tm_un L e)) v1 tr1 ->
+    big_eval L (subst_many L g2 (tm_un L e)) v2 tr2 ->
+    length tr1 = length tr2.
+Proof.
+  intros g1 g2 e v1 v2 tr1 tr2 h1 h2.
+  rewrite subst_many_un in h1. 
+  rewrite subst_many_un in h2. 
+  inversion h1; subst.
+  inversion h2; subst.
+  admit.
+Admitted.
+
+
+
+Lemma trace_rel_split :
+  forall o tr1 tr2 tr3 tr4,
+  trace_rel o (tr1++tr2) (tr3++tr4) ->
+  length tr1 = length tr3 ->
+  trace_rel o tr1 tr3 /\ trace_rel o tr2 tr4.
+Proof.
+Admitted. 
+
+Lemma trace_rel_tail
+      (l1 l2 o : L.(carrier)) (v1 v2 : nat) (tr0 tr1 : trace L) :
+  trace_rel o ((v1,l1) :: tr0) ((v2,l2) :: tr1) ->
+  trace_rel o tr0 tr1.
+Proof.
+Admitted.
+
+
 Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L):
   has_type L G e t ->
-  trace_rel tr1 tr2 ->
   has_sem_type o G e t.
   intros h.
   induction h.
   {
     unfold has_sem_type.
-    intros _ g1 g2 v1 v2 tr_1 tr_2 h1 Hv1 Hv2.
+    intros g1 g2 v1 v2 tr_1 tr_2 h1 rel Hv1 Hv2.
     specialize (h1 x).
     destruct (lookup g1 x) eqn:E1; [ | (rewrite H in h1; contradiction) ].
     destruct (lookup g2 x) eqn:E2; [ | (rewrite H in h1; contradiction) ].
@@ -171,7 +291,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
   }
   {
     unfold has_sem_type.
-    intros _ g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
+    intros g1 g2 v1 v2 tr_1 tr_2 h1 rel h2 h3.
     rewrite subst_many_val in h2.
     rewrite subst_many_val in h3.
     inversion h2; subst.
@@ -180,28 +300,26 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
   }
   {
     unfold has_sem_type.
-    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h1 h2 h3.
+    intros g1 g2 v1 v2 tr_1 tr_2 h1 rel h2 h3.
     rewrite subst_many_un in h2.
     rewrite subst_many_un in h3.
     inversion h2; subst.
     inversion h3; subst.
-    specialize (IHh htr1).
 
-    destruct (IHh g1 g2 v v0 tr_1 tr_2 h1 H0 H1); subst; constructor.
+    destruct (IHh g1 g2 v v0 tr_1 tr_2 h1 rel H0 H1); subst; constructor.
     apply H.
   }
   {
     unfold has_sem_type.
-    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
+    intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
     rewrite subst_many_tm_bin in h_eval1.
     rewrite subst_many_tm_bin in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    specialize (IHh1 htr1).
-    specialize (IHh2 htr1).
-    
-    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub H1 H3); subst.
-    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub H2 H4); subst.
+    apply trace_rel_split in rel.
+    destruct rel as [rel1 rel2].
+    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub rel1 H1 H3); subst.
+    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub rel2 H2 H4); subst.
     - simpl.
       constructor.
     - simpl.
@@ -241,16 +359,20 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       specialize (H5 eq_refl eq_refl).
       apply H5.
      }
+    -specialize (big_eval_trace e1 g1 g2 v0 v1 tr0 tr4) as HBig_eval.
+     specialize (HBig_eval H1 H3).
+     apply HBig_eval.
+     {
+        apply subst_same_shape.
+     }
   }
   {
     unfold has_sem_type.
-    intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
+    intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
     rewrite subst_many_let in h_eval1.
     rewrite subst_many_let in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    specialize (IHh1 htr1).
-    specialize (IHh2 htr1).
 
     unfold has_sem_type in IHh2.
     specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2 tr3 tr5).  
@@ -287,12 +409,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
           intros v e; specialize (H_pull_out_inner_subst x v s n e g); auto.
         + apply IHg.
     }
-    assert (Trace_Empt : forall (tr1 tr2: trace L), tr1 ++ tr2 = [] -> tr1 = [] /\ tr2 = []). {
-      intros tr_1 tr_2 H.
-      induction tr_1 as [| x' tr1' IH].
-      -simpl in H. split; auto.
-      -simpl in H. discriminate.
-    }
+
     rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
     rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
     
@@ -301,19 +418,74 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     apply subst_rel_after_update.
     eapply IHh1.
     apply h_sub.
-    -apply H4.
-    -apply H6.
-    -apply h_sub.
-    -apply H5.
-    -apply H7.
+    apply trace_rel_split in rel.
+    destruct rel as [rel1 rel2].
+    apply rel1.
+    specialize (big_eval_trace e1 g1 g2 v0 v3 tr0 tr4) as HBig_eval.
+    specialize (HBig_eval H4 H6).
+    apply HBig_eval;
+    apply subst_same_shape;
+    destruct H3 as [Htr1 Htr2];
+    rewrite Htr1 in H4;
+    apply H4.
+    apply H4.
+    apply H6.
+    apply h_sub.
+    apply trace_rel_split in rel.
+    destruct rel as [rel1 rel2].
+    apply rel2.
+    specialize (big_eval_trace e1 g1 g2 v0 v3 tr0 tr4) as HBig_eval.
+    specialize (HBig_eval H4 H6).
+    apply HBig_eval;
+    apply subst_same_shape;
+    apply H5.
+    apply H5.
+    apply H7.
     }
     {
       unfold has_sem_type.
-      intros htr1 g1 g2 v1 v2 tr_1 tr_2 h_sub h_eval1 h_eval2.
+      intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
       rewrite subst_many_declass in h_eval1.
       rewrite subst_many_declass in h_eval2.
       inversion h_eval1; subst. 
-      admit.
+      inversion h_eval2; subst.
+      inversion rel.
+      
+      unfold has_sem_type in IHh.
+      apply trace_rel_tail in rel.
+      destruct (IHh g1 g2 v1 v2 tr tr0 h_sub rel H3 H4).
+      -apply TR_Low.
+      -destruct (L.(le) Label t) eqn:Hlt.
+        *destruct (L.(le) Label o0) eqn:Hlt2.
+         {
+          subst. apply TR_Low.
+         }
+         {
+          subst. apply TR_Low.
+         }
+        *destruct (L.(le) Label o0) eqn:Hlt2.
+         {
+          subst. apply TR_Low.
+         }
+         {
+          subst. apply TR_Low.
+         }
+      -destruct (L.(le) Label t) eqn:Hlt.
+        *destruct (L.(le) Label o0) eqn:Hlt2.
+        {
+         subst. constructor. destruct H9 as [H91 H92]. apply H91.
+        }
+        {
+          subst. constructor. apply Hlt2.
+        }
+        *destruct (L.(le) Label o0) eqn:Hlt2.
+        {
+          subst. constructor. destruct H9 as [H91 H92]. apply H91.
+        }
+        {
+          subst. constructor. apply Hlt2.
+        }
+      -discriminate.
     }
 Qed.
 
