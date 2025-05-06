@@ -23,10 +23,12 @@ Inductive smap_shape_rel : smap -> smap -> Prop :=
     smap_shape_rel ((x, n1) :: g1) ((x, n2) :: g2).
 
 Inductive shape_rel : tm L -> tm L -> Prop :=
-  | SR_Var : forall x, 
+  | SR_Var : forall x,
       shape_rel (tm_var L x) (tm_var L x)
-  | SR_Var_Val : forall x, 
-      shape_rel (tm_var L x) (tm_var L x)
+  | SR_Var_Left : forall x v1,
+      shape_rel (tm_var L x) (tm_val L v1)
+  | SR_Var_Right : forall x v1,
+      shape_rel (tm_val L v1) (tm_var L x)
   | SR_Val : forall v1 v2,
       shape_rel (tm_val L v1) (tm_val L v2)
   | SR_Un : forall e1 e2,
@@ -62,31 +64,43 @@ Inductive trace_rel :  L.(carrier) -> trace L -> trace L -> Prop :=
   tr2 = [] ->
   trace_rel o tr1 tr2. 
 
+Lemma smap_shape :
+  forall e g1 g2 v1 v2 x,
+  smap_shape_rel g1 g2 ->
+  (subst_many L g1 e) = (tm_val L v1) /\ (subst_many L g2 e) = (tm_val L v2)
+  \/ (subst_many L g1 e) = (tm_var L x) /\ (subst_many L g2 e) = (tm_var L x).
+Proof.
+Admitted.
+
 Lemma subst_same_shape : 
   forall g1 g2 e,
-  smap_shape_rel g1 g2 ->
   shape_rel (subst_many L g1 e) (subst_many L g2 e).
 Proof.
   intros g1 g2 e. 
   induction e.
   - rewrite subst_many_var.
     rewrite subst_many_var.
-    induction lookup.
+    induction lookup; induction lookup; try constructor.
   - rewrite subst_many_val.
     rewrite subst_many_val.
     constructor.
   - rewrite subst_many_tm_bin. 
     rewrite subst_many_tm_bin.
     constructor. 
-    apply IHe1. apply H. 
-    apply IHe2. apply H.
+    apply IHe1. 
+    apply IHe2.
   - rewrite subst_many_un.
     rewrite subst_many_un.
     constructor.
-    apply IHe.
+    apply IHe. 
   - rewrite subst_many_let.
     rewrite subst_many_let.
-    constructor.        
+    constructor; admit.
+  - rewrite subst_many_declass.
+    rewrite subst_many_declass.
+    constructor.
+    apply IHe.
+Admitted.        
 
 Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
@@ -211,6 +225,15 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
+Lemma big_eval_trace_length:
+  forall e1 e2 v1 v2 tr1 tr2,
+  shape_rel e1 e2 ->
+  big_eval L e1 v1 tr1 ->
+  big_eval L e2 v2 tr2 ->
+  length tr1 = length tr2.
+Proof.
+Admitted. 
+
 Lemma big_eval_trace :
    forall e g1 g2 v1 v2 tr1 tr2,
    big_eval L (subst_many L g1 e) v1 tr1 ->
@@ -219,41 +242,49 @@ Lemma big_eval_trace :
    length tr1 = length tr2.
 Proof.
   intros e g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
-  induction h1.
-  -inversion h3.
-Admitted.
-
-
-
-Lemma tm_val_trace :
-  forall g1 g2 v v1 v2 tr1 tr2,
-    big_eval L (subst_many L g1 (tm_val L v)) v1 tr1 ->
-    big_eval L (subst_many L g2 (tm_val L v)) v2 tr2 ->
-    length tr1 = length tr2.
-Proof.
-  intros g1 g2 v v1 v2 tr1 tr2 h1 h2.
-  rewrite subst_many_val in h1. 
-  rewrite subst_many_val in h2. 
   inversion h1; subst.
-  inversion h2; subst.
-  reflexivity.
+  rewrite <- H0 in h3;
+  inversion h3; subst.
+  - rewrite <- H in h3.
+    rewrite <- H in h2.
+    inversion h2; subst.
+    reflexivity.
+  - rewrite <- H in h3. 
+    inversion h3; subst.
+    rewrite <- H in h1.
+    rewrite <- H2 in h2.
+    inversion h2; subst.
+    rewrite <- H2 in h3.
+    specialize (big_eval_trace_length (tm_un L e0) (tm_un L e2) (f_un v) (f_un v0) tr1 tr2) as hb_length.
+    specialize (hb_length h3 h1 h2).
+    apply hb_length.
+  - rewrite <- H in h3.
+    inversion h3; subst.
+    rewrite <- H in h1.
+    rewrite <- H4 in h2.
+    inversion h2; subst.
+    rewrite <- H4 in h3.
+    specialize (big_eval_trace_length (tm_bin L e1 e2) (tm_bin L e4 e5) (f_bin v0 v3)  (f_bin v1 v4) (tr0 ++ tr3) (tr1 ++ tr4)) as hb_length.
+    specialize (hb_length h3 h1 h2).
+    apply hb_length.
+  - rewrite <- H in h3.
+    inversion h3; subst.
+    rewrite <- H in h1.
+    rewrite <- H6 in h2.
+    inversion h2; subst.
+    rewrite <- H6 in h3.
+    specialize (big_eval_trace_length (tm_let L x e1 e2) (tm_let L x e4 e5) v1 v2 (tr0 ++ tr3) (tr1 ++ tr4)) as hb_length.
+    specialize (hb_length h3 h1 h2).
+    apply hb_length.
+  - rewrite <- H in h3.
+    inversion h3; subst.
+    rewrite <- H in h1.
+    rewrite <- H4 in h2.
+    rewrite <- H4 in h3.
+    specialize (big_eval_trace_length (tm_declass L e0 L0) (tm_declass L e2 L0) v1 v2 ((v1, L0) :: tr) tr2) as hb_length.
+    specialize (hb_length h3 h1 h2).
+    apply hb_length.
 Qed.
-
-Lemma tm_un_trace :
-  forall g1 g2 e v1 v2 tr1 tr2,
-    big_eval L (subst_many L g1 (tm_un L e)) v1 tr1 ->
-    big_eval L (subst_many L g2 (tm_un L e)) v2 tr2 ->
-    length tr1 = length tr2.
-Proof.
-  intros g1 g2 e v1 v2 tr1 tr2 h1 h2.
-  rewrite subst_many_un in h1. 
-  rewrite subst_many_un in h2. 
-  inversion h1; subst.
-  inversion h2; subst.
-  admit.
-Admitted.
-
-
 
 Lemma trace_rel_split :
   forall o tr1 tr2 tr3 tr4,
