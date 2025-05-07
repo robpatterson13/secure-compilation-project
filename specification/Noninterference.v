@@ -15,12 +15,6 @@ Inductive type_rel : L.(carrier) -> L.(carrier) -> nat -> nat -> Prop :=
   | TR_High : forall o t v1 v2,
       L.(le) t o = false -> 
       type_rel o t v1 v2.
-      
-Inductive smap_shape_rel : smap -> smap -> Prop :=
-  | SMap_Empty : smap_shape_rel [] []
-  | SMap_Cons : forall x n1 n2 g1 g2,
-    smap_shape_rel g1 g2 ->
-    smap_shape_rel ((x, n1) :: g1) ((x, n2) :: g2).
 
 Inductive shape_rel : tm L -> tm L -> Prop :=
   | SR_Var : forall x,
@@ -62,22 +56,109 @@ Inductive trace_rel :  L.(carrier) -> trace L -> trace L -> Prop :=
 | Decl_Empty : forall o tr1 tr2,
   tr1 = [] ->
   tr2 = [] ->
-  trace_rel o tr1 tr2. 
+  trace_rel o tr1 tr2.
+  
+Inductive smap_shape_rel : smap -> smap -> Prop :=
+  | SMap_Empty : smap_shape_rel [] []
+  | SMap_Cons : forall x n1 n2 g1 g2,
+    smap_shape_rel g1 g2 ->
+    smap_shape_rel ((x, n1) :: g1) ((x, n2) :: g2).
 
-Lemma smap_shape :
-  forall e g1 g2 v1 v2 x,
-  smap_shape_rel g1 g2 ->
-  (subst_many L g1 e) = (tm_val L v1) /\ (subst_many L g2 e) = (tm_val L v2)
-  \/ (subst_many L g1 e) = (tm_var L x) /\ (subst_many L g2 e) = (tm_var L x).
+Definition filter_smap (g : smap) (x : string) : smap :=
+  filter (fun y => negb (String.eqb (fst y) x)) g.
+
+Lemma lookup_filter:
+  forall (g : smap) (x1 x2 : string),
+  (x1 =? x2)%string = false
+  -> lookup(filter_smap g x2) x1 = lookup g x1.
 Proof.
+intros.
+induction g.
+{
+  auto.
+}
+{
+  simpl.
+  destruct a.
+  simpl.
+  destruct (s =? x2)%string eqn:H_x2.
+  {
+    
+    destruct (x1 =? x2)%string eqn:H_x1.
+    {
+      discriminate. 
+    }
+    {
+      simpl.
+      apply String.eqb_eq in H_x2. 
+      subst s.
+      rewrite H_x1.
+      apply IHg.
+    }
+  }
+  {
+    simpl. destruct (x1 =? s)%string eqn:H_x1.
+    {
+     auto. 
+    }
+    {
+      apply IHg. 
+    } 
+  }
+}
+Qed.
+
+Lemma smap_shape_rel_filter :
+  forall g1 g2 x,
+    smap_shape_rel g1 g2 ->
+    smap_shape_rel (filter (fun y => negb (String.eqb (fst y) x)) g1)
+                   (filter (fun y => negb (String.eqb (fst y) x)) g2).
+Proof.
+  intros g1 g2 x Hrel.
+  induction Hrel.
+  - simpl. constructor.
+  - simpl. destruct (String.eqb x0 x) eqn:Heq.
+    * apply IHHrel.
+    * constructor. apply IHHrel.
+Qed.
+
+Lemma shape_rel_filter :
+  forall g1 g2 x e,
+    shape_rel (subst_many L g1 e) (subst_many L g2 e) ->
+    shape_rel
+      (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g1) e)
+      (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g2) e).
+Proof.
+  intros g1 g2 x e.
+  generalize dependent g1.
+  generalize dependent g2.
+  induction e; intros g1 g2 Hrel; simpl.
+  - rewrite subst_many_var.
+    rewrite subst_many_var.
+    destruct (String.eqb x s) eqn:Heq.
+    + apply String.eqb_eq in Heq. subst s.
+    simpl. admit.
+    + rewrite subst_many_var in Hrel.
+      rewrite subst_many_var in Hrel.
+      admit.
+  - rewrite subst_many_val.
+    rewrite subst_many_val.
+    constructor.
+  - rewrite subst_many_tm_bin.
+    rewrite subst_many_tm_bin.
+    inversion Hrel; subst.
+    * constructor.
 Admitted.
+
+
+    
 
 Lemma subst_same_shape : 
   forall g1 g2 e,
   shape_rel (subst_many L g1 e) (subst_many L g2 e).
 Proof.
   intros g1 g2 e. 
-  induction e.
+  induction e; simpl.
   - rewrite subst_many_var.
     rewrite subst_many_var.
     induction lookup; induction lookup; try constructor.
@@ -95,12 +176,16 @@ Proof.
     apply IHe. 
   - rewrite subst_many_let.
     rewrite subst_many_let.
-    constructor; admit.
+    constructor.
+    * apply IHe1.
+    * specialize (shape_rel_filter g1 g2 s e2) as Hfilt.
+      specialize (Hfilt IHe2).
+      apply Hfilt.
   - rewrite subst_many_declass.
     rewrite subst_many_declass.
     constructor.
     apply IHe.
-Admitted.        
+Qed.      
 
 Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
   fun G g1 g2 =>
@@ -142,50 +227,6 @@ Lemma subst_rel_update:
   }  
 Qed.
 
-Definition filter_smap (g : smap) (x : string) : smap :=
-  filter (fun y => negb (String.eqb (fst y) x)) g.
-    
-Lemma lookup_filter:
-  forall (g : smap) (x1 x2 : string),
-  (x1 =? x2)%string = false
-  -> lookup(filter_smap g x2) x1 = lookup g x1.
-Proof.
-intros.
-induction g.
-{
-  auto.
-}
-{
-  simpl.
-  destruct a.
-  simpl.
-  destruct (s =? x2)%string eqn:H_x2.
-  {
-    
-    destruct (x1 =? x2)%string eqn:H_x1.
-    {
-      discriminate. 
-    }
-    {
-      simpl.
-      apply String.eqb_eq in H_x2. 
-      subst s.
-      rewrite H_x1.
-      apply IHg. 
-    }
-  }
-  {
-    simpl. destruct (x1 =? s)%string eqn:H_x1.
-    {
-     auto. 
-    }
-    {
-      apply IHg. 
-    } 
-  }
-}
-Qed.
-
 Lemma subst_rel_after_update:
   forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : L.(carrier)),
     type_rel o t v1 v2 ->
@@ -225,6 +266,78 @@ Lemma subst_rel_after_update:
   }
 Qed.
 
+Fixpoint count_declass (t : tm L) : nat :=
+  match t with
+  | tm_var _ _ => 0
+  | tm_val _ _ => 0
+  | tm_un _ e => count_declass e
+  | tm_bin _ e1 e2 => count_declass e1 + count_declass e2
+  | tm_let _ _ e1 e2 => count_declass e1 + count_declass e2
+  | tm_declass _ e _ => 1 + count_declass e
+  end.
+
+Lemma count_declass_subst :
+  forall x v e,
+    count_declass (subst L x v e) = count_declass e.
+Proof.
+  intros e1 e2 H.
+  induction H; simpl.
+  - induction (e1 =? s)%string.
+    * constructor.
+    * constructor.
+  - reflexivity.
+  - rewrite IHtm1. rewrite IHtm2. reflexivity.
+  - rewrite IHtm. reflexivity.
+  - rewrite <- IHtm1. rewrite <- IHtm2.
+    induction (e1 =? s)%string.
+    * rewrite IHtm1. rewrite IHtm2. reflexivity.
+    * reflexivity.
+  - rewrite IHtm. reflexivity.
+Qed.
+
+Lemma eval_trace_matches_declass_count :
+  forall e v tr,
+    big_eval L e v tr ->
+    length tr = count_declass e.
+Proof.
+  intros e v tr Heval.
+  induction Heval; simpl.
+  - reflexivity.
+  - assumption.
+  - rewrite app_length.
+    rewrite IHHeval1.
+    rewrite IHHeval2.
+    reflexivity.
+  - rewrite app_length.
+    rewrite IHHeval1, IHHeval2.
+    rewrite count_declass_subst.
+    reflexivity.
+  - rewrite IHHeval.
+    reflexivity.
+Qed.
+
+Lemma count_declass_preserved_by_shape_rel :
+  forall e1 e2,
+    shape_rel e1 e2 ->
+    count_declass e1 = count_declass e2.
+Proof.
+  intros e1 e2 H.
+  induction H; simpl.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - apply IHshape_rel.
+  - rewrite IHshape_rel1.
+    rewrite IHshape_rel2.
+    reflexivity.
+  - rewrite IHshape_rel1.
+    rewrite IHshape_rel2.
+    reflexivity.
+  - rewrite IHshape_rel.
+    reflexivity.
+Qed.
+
 Lemma big_eval_trace_length:
   forall e1 e2 v1 v2 tr1 tr2,
   shape_rel e1 e2 ->
@@ -232,7 +345,12 @@ Lemma big_eval_trace_length:
   big_eval L e2 v2 tr2 ->
   length tr1 = length tr2.
 Proof.
-Admitted. 
+  intros e1 e2 v1 v2 tr1 tr2 Hshape Heval1 Heval2.
+  pose proof eval_trace_matches_declass_count _ _ _ Heval1 as Hlen1.
+  pose proof eval_trace_matches_declass_count _ _ _ Heval2 as Hlen2.
+  pose proof count_declass_preserved_by_shape_rel _ _ Hshape as Hcount.
+  rewrite Hlen1. rewrite Hlen2. apply Hcount.
+Qed.
 
 Lemma big_eval_trace :
    forall e g1 g2 v1 v2 tr1 tr2,
@@ -245,6 +363,9 @@ Proof.
   inversion h1; subst.
   rewrite <- H0 in h3;
   inversion h3; subst.
+  - rewrite <- H in h3.
+    rewrite <- H in h2.
+    inversion h2; subst.
   - rewrite <- H in h3.
     rewrite <- H in h2.
     inversion h2; subst.
@@ -292,6 +413,21 @@ Lemma trace_rel_split :
   length tr1 = length tr3 ->
   trace_rel o tr1 tr3 /\ trace_rel o tr2 tr4.
 Proof.
+intros o tr1 tr2 tr3 tr4 Hrel Hlen. split.
+- inversion Hrel; subst; simpl.
+ * 
+
+induction tr1.
+- split.
+  * constructor. reflexivity.
+    destruct tr3; simpl in Hlen; try discriminate; reflexivity.
+  * constructor. destruct tr3; simpl in Hlen; try discriminate.
+    simpl in Hrel. inversion Hrel; subst.
+    {
+      exfalso.
+    }
+      
+
 Admitted. 
 
 Lemma trace_rel_tail
