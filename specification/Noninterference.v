@@ -407,29 +407,6 @@ Proof.
     apply hb_length.
 Qed.
 
-Lemma trace_rel_split :
-  forall o tr1 tr2 tr3 tr4,
-  trace_rel o (tr1++tr2) (tr3++tr4) ->
-  length tr1 = length tr3 ->
-  trace_rel o tr1 tr3 /\ trace_rel o tr2 tr4.
-Proof.
-intros o tr1 tr2 tr3 tr4 Hrel Hlen. split.
-- inversion Hrel; subst; simpl.
- * 
-
-induction tr1.
-- split.
-  * constructor. reflexivity.
-    destruct tr3; simpl in Hlen; try discriminate; reflexivity.
-  * constructor. destruct tr3; simpl in Hlen; try discriminate.
-    simpl in Hrel. inversion Hrel; subst.
-    {
-      exfalso.
-    }
-      
-
-Admitted. 
-
 Lemma trace_rel_tail
       (l1 l2 o : L.(carrier)) (v1 v2 : nat) (tr0 tr1 : trace L) :
   trace_rel o ((v1,l1) :: tr0) ((v2,l2) :: tr1) ->
@@ -437,6 +414,185 @@ Lemma trace_rel_tail
 Proof.
 Admitted.
 
+Lemma trace_rel_length :
+  forall o tr1 tr2,
+    trace_rel o tr1 tr2 ->
+    length tr1 = length tr2.
+Proof.
+  intros o tr1 tr2 Hrel.
+  induction Hrel.
+  - simpl. f_equal. assumption.
+  - simpl. f_equal. assumption.
+  - subst. reflexivity.
+Qed.
+
+Lemma trace_rel_app :
+  forall o t1 t2 t3 t4,
+    trace_rel o t1 t3 ->
+    trace_rel o t2 t4 ->
+    trace_rel o (t1 ++ t2) (t3 ++ t4).
+Proof.
+  intros o t1 t2 t3 t4 Hrel1 Hrel2.
+  revert t2 t4 Hrel2.
+  induction Hrel1.
+  - intros t2 t4 Hrel2.
+    simpl.
+    constructor.
+    * apply IHHrel1. assumption.
+    * assumption.
+    * assumption.
+  - intros t2 t4 Hrel2.
+    simpl.
+    apply Decl_Sec.
+    * apply IHHrel1. assumption.
+    * assumption.
+  - intros t2 t4 Hrel2.
+    simpl. rewrite H. rewrite H0. simpl. assumption.
+Qed.
+
+Lemma H_pull_out_inner_subst : 
+  forall x v s n e g,
+    x <> s ->
+    (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n (subst L x v e)))
+    = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n e))). 
+Proof.
+  intros.
+  induction g; simpl.
+  - apply (subst_neq_id_commute L x s v n e).
+    exact H.
+  - destruct a; simpl; destruct (String.eqb s0 x) eqn:H_s0_x0; simpl.
+    + apply IHg.
+    + rewrite (subst_neq_id_commute L x s v n e).
+      rewrite (subst_neq_id_commute L x s0 v n0 (subst L s n e)).
+      apply (subst_many_subst_commute L x v g (subst L s0 n0 (subst L s n e))).
+      apply String.eqb_neq in H_s0_x0.
+      apply id_neq_sym in H_s0_x0; exact H_s0_x0.
+      exact H.
+Qed.
+
+Lemma subst_many_update_split :
+  forall g x v e,
+    subst_many L (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e
+    = subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) e).
+Proof.
+  intros g x v e.
+  induction g as [| [y n] g' IH]; simpl.
+  - reflexivity.
+  - destruct (String.eqb y x) eqn:Heq.
+    + apply IH.
+    + simpl. admit.
+Admitted.
+
+Lemma trace_rel_split :
+  forall o e g1 g2 v1 v2 tr1 tr2 tr3 tr4,
+  trace_rel o (tr1++tr2) (tr3++tr4) ->
+  big_eval L (subst_many L g1 e) v1 tr1 ->
+  big_eval L (subst_many L g2 e) v2 tr3 ->
+  trace_rel o tr1 tr3 /\ trace_rel o tr2 tr4.
+Proof.
+intros. revert g1 g2 v1 v2 tr1 tr2 tr3 tr4 H H0 H1. induction e.
+{
+  intros.
+  rewrite subst_many_var in H0, H1.
+  destruct lookup in H0; destruct lookup in H1.
+  - inversion H0; subst. inversion H1; subst. split.
+    * constructor; auto.
+    * simpl in H. assumption.
+  - inversion H0; subst. inversion H1; subst.
+  - inversion H0; subst.
+  - inversion H0; subst.
+}
+{
+  intros.
+  rewrite subst_many_val in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  split.
+  - constructor; auto.
+  - simpl in H. apply H.
+}
+{
+  intros.
+  rewrite subst_many_tm_bin in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe1 g1 g2 v0 v1 tr0 (tr5++tr2) tr1 (tr6++tr4)).
+  repeat rewrite <- app_assoc in H.
+  specialize (IHe1 H H4 H6).
+  inversion IHe1; subst. 
+  specialize (IHe2 g1 g2 v3 v4 tr5 tr2 tr6 tr4).
+  destruct IHe1 as [IHe11 IHe12].
+  specialize (IHe2 IHe12).
+  specialize (IHe2 H5 H7).
+  destruct IHe2 as [IHe21 IHe22].
+  split.
+  - apply trace_rel_app.
+    * assumption.
+    * assumption. 
+  - apply IHe22. 
+}
+{
+  intros.
+  rewrite subst_many_un in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe g1 g2 v v0 tr1 tr2 tr3 tr4).
+  specialize (IHe H H3 H4).
+  destruct IHe as [IHe1 IHe2].
+  split; assumption.
+}
+{
+  intros.
+  rewrite subst_many_let in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe1 g1 g2 v0 v3 tr0 (tr5++tr2) tr1 (tr6++tr4)).
+  repeat rewrite <- app_assoc in H.
+  specialize (IHe1 H H7 H9).
+  inversion IHe1; subst. 
+  specialize (IHe2 g1 g2 v1 v2 tr5 tr2 tr6 tr4).
+  destruct IHe1 as [IHe11 IHe12].
+  specialize (IHe2 IHe12).
+  admit.
+}
+{
+  intros.
+  rewrite subst_many_declass in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe g1 g2 v1 v2 tr tr2 tr0 tr4) as IHtrace.
+  assert (trace_rel o (tr++tr2) (tr0++tr4)) as Hsame. {
+    inversion H; subst.
+    - apply H9.
+    - apply H5.
+    - discriminate.
+  }
+  specialize (IHtrace Hsame H6 H7).
+  destruct IHtrace as [IHtrace1 IHtrace2].
+  assert (trace_rel o ((v1, c) :: tr) ((v2, c) :: tr0)) as Hsame2. {
+    inversion H. 
+    - apply Decl_Pub. 
+      * assumption.
+      * assumption.
+      * assumption.
+    - apply Decl_Sec.
+      * assumption.
+      * assumption.
+    - discriminate.
+  }
+  split. apply Hsame2. apply IHtrace2.
+}
+Admitted.
+
+Lemma H_update_subst_equiv : 
+  forall x g v e,
+    (subst_many L (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e)
+    = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) e)). 
+  Proof.
+  simpl.
+  induction g; simpl.
+  - reflexivity.
+  - destruct a; simpl.
+  destruct (negb (String.eqb s x)) eqn:H_eq; simpl.
+  + apply Bool.negb_true_iff in H_eq; apply String.eqb_neq in H_eq.
+  intros v e; specialize (H_pull_out_inner_subst x v s n e g); auto.
+  + apply IHg.
+Qed.
 
 Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L):
   has_type L G e t ->
@@ -483,10 +639,18 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     rewrite subst_many_tm_bin in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    apply trace_rel_split in rel.
-    destruct rel as [rel1 rel2].
-    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub rel1 H1 H3); subst.
-    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub rel2 H2 H4); subst.
+    unfold has_sem_type in IHh1.
+    assert (trace_rel o tr0 tr4) as Hqn1. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v1 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
+      apply H0rel.
+    }
+    assert (trace_rel o tr3 tr5) as Hqn2. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v1 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
+      apply H.
+    }
+
+    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub Hqn1 H1 H3); subst.
+    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub Hqn2 H2 H4); subst.
     - simpl.
       constructor.
     - simpl.
@@ -526,12 +690,6 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       specialize (H5 eq_refl eq_refl).
       apply H5.
      }
-    -specialize (big_eval_trace e1 g1 g2 v0 v1 tr0 tr4) as HBig_eval.
-     specialize (HBig_eval H1 H3).
-     apply HBig_eval.
-     {
-        apply subst_same_shape.
-     }
   }
   {
     unfold has_sem_type.
@@ -542,70 +700,42 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     inversion h_eval2; subst.
 
     unfold has_sem_type in IHh2.
-    specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2 tr3 tr5).  
-            
-    (* want to generalize following assertions as lemmas over
-       arbitrary gammas without x *)        
-    assert (H_pull_out_inner_subst : forall x v s n e g,
-               x <> s ->
-               (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n (subst L x v e)))
-               = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) (subst L s n e)))). {
-      intros.
-      induction g; simpl.
-      - apply (subst_neq_id_commute L x0 s v n e).
-        exact H.
-      - destruct a; simpl; destruct (String.eqb s0 x0) eqn:H_s0_x0; simpl.
-        + apply IHg.
-        + rewrite (subst_neq_id_commute L x0 s v n e).
-          rewrite (subst_neq_id_commute L x0 s0 v n0 (subst L s n e)).
-          apply (subst_many_subst_commute L x0 v g (subst L s0 n0 (subst L s n e))).
-          apply String.eqb_neq in H_s0_x0.
-          apply id_neq_sym in H_s0_x0; exact H_s0_x0.
-          exact H.
-    }
-    
-    assert (H_update_subst_equiv : forall g v e,
-               (subst_many L (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e)
-               = (subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) e))). {
-      simpl.
-      induction g; simpl.
-      - reflexivity.
-      - destruct a; simpl.
-        destruct (negb (String.eqb s x)) eqn:H_eq; simpl.
-        + apply Bool.negb_true_iff in H_eq; apply String.eqb_neq in H_eq.
-          intros v e; specialize (H_pull_out_inner_subst x v s n e g); auto.
-        + apply IHg.
-    }
+    specialize (IHh2 (update (filter (fun y => negb (String.eqb (fst y) x)) g1) x v0) (update (filter (fun y => negb (String.eqb (fst y) x)) g2) x v3) v1 v2 tr3 tr5). 
 
-    rewrite (H_update_subst_equiv g1 v0 e2) in IHh2.
-    rewrite (H_update_subst_equiv g2 v3 e2) in IHh2.
+    rewrite (H_update_subst_equiv x g1 v0 e2) in IHh2.
+    rewrite (H_update_subst_equiv x g2 v3 e2) in IHh2.
     
     unfold has_sem_type in IHh1.
     apply IHh2.
     apply subst_rel_after_update.
+    assert (trace_rel o tr0 tr4) as Hqn1. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v3 tr0 tr3 tr4 tr5 rel H4 H6) as [H0rel _].
+      apply H0rel.
+    }
+    assert (trace_rel o tr3 tr5) as Hqn2. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v3 tr0 tr3 tr4 tr5 rel H4 H6) as [H0rel].
+      apply H.
+    }
+    assert (length tr0 = length tr4) as Hqn3. {
+      specialize (trace_rel_length o tr0 tr4) as Hlen.
+      specialize (Hlen Hqn1).
+      assumption.
+    }
     eapply IHh1.
     apply h_sub.
-    apply trace_rel_split in rel.
-    destruct rel as [rel1 rel2].
-    apply rel1.
-    specialize (big_eval_trace e1 g1 g2 v0 v3 tr0 tr4) as HBig_eval.
-    specialize (HBig_eval H4 H6).
-    apply HBig_eval;
-    apply subst_same_shape;
-    destruct H3 as [Htr1 Htr2];
-    rewrite Htr1 in H4;
-    apply H4.
+    apply Hqn1.
     apply H4.
     apply H6.
     apply h_sub.
-    apply trace_rel_split in rel.
-    destruct rel as [rel1 rel2].
-    apply rel2.
-    specialize (big_eval_trace e1 g1 g2 v0 v3 tr0 tr4) as HBig_eval.
-    specialize (HBig_eval H4 H6).
-    apply HBig_eval;
-    apply subst_same_shape;
-    apply H5.
+    assert (trace_rel o tr0 tr4) as Hqn1. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v3 tr0 tr3 tr4 tr5 rel H4 H6) as [H0rel _].
+      assumption.
+    }
+    assert (trace_rel o tr3 tr5) as Hqn2. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v3 tr0 tr3 tr4 tr5 rel H4 H6) as [H0rel].
+      apply H.
+    }
+    apply Hqn2.
     apply H5.
     apply H7.
     }
@@ -619,8 +749,7 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       inversion rel.
       
       unfold has_sem_type in IHh.
-      apply trace_rel_tail in rel.
-      destruct (IHh g1 g2 v1 v2 tr tr0 h_sub rel H3 H4).
+      destruct (IHh g1 g2 v1 v2 tr tr0 h_sub H6 H3 H4).
       -apply TR_Low.
       -destruct (L.(le) Label t) eqn:Hlt.
         *destruct (L.(le) Label o0) eqn:Hlt2.
