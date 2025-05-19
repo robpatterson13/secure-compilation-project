@@ -13,7 +13,12 @@ Scheme Equality for ty.
 Section Types.
   Variable (L : Lattice).
 
-Definition context : Type := list (string *  (L.(carrier))). 
+Inductive type :=
+| nat_type
+| bool_type.
+
+Definition context : Type := list (string * L.(carrier)). 
+Definition type_context : Type := list (string * type).
 
 Inductive has_type : context -> tm L -> L.(carrier) -> Prop :=
 | T_Var : forall Gamma x t1,

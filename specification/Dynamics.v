@@ -17,15 +17,19 @@ Record Lattice := {
 Section LatticeSection.
   Variable (L : Lattice).
 
+Inductive value : Type :=
+| VNat : nat -> value
+| VBool : bool -> value.
+
 Inductive tm : Type :=
 | tm_var : string -> tm
-| tm_val : nat -> tm
+| tm_val : value -> tm
 | tm_bin : tm -> tm -> tm
 | tm_un : tm -> tm
 | tm_let : string -> tm -> tm -> tm
 | tm_declass : tm -> L.(carrier) -> tm.
 
-Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
+Fixpoint subst (x : string) (s : value) (t : tm) : tm :=
   match t with
   | tm_var y => if String.eqb x y then tm_val s else t
   | tm_val _ => t 
@@ -37,9 +41,9 @@ Fixpoint subst (x : string) (s : nat) (t : tm) : tm :=
   | tm_declass t l => tm_declass (subst x s t) l
   end.
 
-Definition smap : Type := list (string * nat).
+Definition smap : Type := list (string * value).
 
-Definition trace : Type := list (nat * L.(carrier)).
+Definition trace : Type := list (value * L.(carrier)).
 
 Fixpoint subst_many (bindings : smap) (t : tm) : tm :=
   match bindings with
@@ -61,10 +65,10 @@ Fixpoint lookup {A} (m : list (string * A)) (x : string) : option A :=
       else lookup m' x
   end.
 
-Axiom f_un : nat -> nat.
-Axiom f_bin : nat -> nat -> nat.
+Axiom f_un : value -> value.
+Axiom f_bin : value -> value -> value.
 
-Inductive big_eval : tm -> nat -> trace -> Prop := 
+Inductive big_eval : tm -> value -> trace -> Prop := 
 | Etm_val : forall v,
   big_eval (tm_val v) v []
 | Etm_un : forall e v v' tr,
@@ -83,7 +87,7 @@ Inductive big_eval : tm -> nat -> trace -> Prop :=
   big_eval e v tr ->
   big_eval (tm_declass e L) v ((v, L) :: tr). 
 
-  Theorem big_eval_det (t : tm) (v1 v2 : nat) (tr1 tr2 : trace) : 
+  Theorem big_eval_det (t : tm) (v1 v2 : value) (tr1 tr2 : trace) : 
   big_eval t v1 tr1 ->
   big_eval t v2 tr2 ->
   v1 = v2.
@@ -196,7 +200,7 @@ Proof.
 Qed.
 
 Lemma subst_eq_id_erasure:
-  forall (x s : string) (v n : nat) (e : tm),
+  forall (x s : string) (v n : value) (e : tm),
     x = s ->
     (subst s n (subst x v e)) = (subst x v e).
   intros.
@@ -225,7 +229,7 @@ Lemma id_neq_sym:
 Qed.
 
 Lemma subst_neq_id_commute:
-  forall (x s : string) (v n : nat) (e : tm),
+  forall (x s : string) (v n : value) (e : tm),
     x <> s ->
     (subst s n (subst x v e)) = (subst x v (subst s n e)).
   intros.
@@ -257,7 +261,7 @@ Lemma subst_neq_id_commute:
 Qed.
 
 Lemma subst_many_subst_commute:
-  forall (x : string) (v : nat) (g : smap) (e : tm),
+  forall (x : string) (v : value) (g : smap) (e : tm),
     (subst_many (filter (fun y => negb (String.eqb (fst y) x)) g) (subst x v e))
     = (subst x v (subst_many (filter (fun y => negb (String.eqb (fst y) x)) g) e)).
   induction g; simpl.
@@ -266,8 +270,8 @@ Lemma subst_many_subst_commute:
     + intro e.
       apply Bool.negb_true_iff in H_s_x. apply String.eqb_neq in H_s_x.
       apply id_neq_sym in H_s_x.
-      rewrite (subst_neq_id_commute x s v n e H_s_x).
-      rewrite (IHg (subst s n e)).
+      rewrite (subst_neq_id_commute x s v v0 e H_s_x).
+      rewrite (IHg (subst s v0 e)).
       reflexivity.
     + apply IHg.
 Qed.
