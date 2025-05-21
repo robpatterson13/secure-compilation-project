@@ -7,40 +7,19 @@ Require Import Statics.
 Section Noninterference.
   Variable (L : Lattice).
 
-  Definition context : Type := list (string *  (L.(carrier))).
 
-Inductive type_rel : L.(carrier) -> L.(carrier) -> nat -> nat -> Prop :=
-  | TR_Low : forall o t v, 
-      type_rel o t v v 
-  | TR_High : forall o t v1 v2,
+Inductive type_rel : L.(carrier) -> type L -> value -> value -> Prop :=
+  | TR_Low_Nat : forall o t v, 
+      type_rel o (nat_L L t) (VNat v) (VNat v) 
+  | TR_Low_Bool : forall o t v, 
+      type_rel o (bool_L L t) (VBool v) (VBool v) 
+  | TR_High_Nat : forall o t v1 v2,
       L.(le) t o = false -> 
-      type_rel o t v1 v2.
+      type_rel o (nat_L L t) (VNat v1) (VNat v2)
+  | TR_High_Bool : forall o t v1 v2,
+      L.(le) t o = false -> 
+      type_rel o (bool_L L t) (VBool v1) (VBool v2).
 
-Inductive shape_rel : tm L -> tm L -> Prop :=
-  | SR_Var : forall x,
-      shape_rel (tm_var L x) (tm_var L x)
-  | SR_Var_Left : forall x v1,
-      shape_rel (tm_var L x) (tm_val L v1)
-  | SR_Var_Right : forall x v1,
-      shape_rel (tm_val L v1) (tm_var L x)
-  | SR_Val : forall v1 v2,
-      shape_rel (tm_val L v1) (tm_val L v2)
-  | SR_Un : forall e1 e2,
-      shape_rel e1 e2 ->
-      shape_rel (tm_un L e1) (tm_un L e2)
-  | SR_Bin : forall e1 e2 e3 e4,
-      shape_rel e1 e3 ->
-      shape_rel e2 e4 ->
-      shape_rel (tm_bin L e1 e2) (tm_bin L e3 e4)
-  | SR_Let : forall e1 e2 e3 e4 x,
-      shape_rel e1 e3 ->
-      shape_rel e2 e4 ->
-      shape_rel (tm_let L x e1 e2) (tm_let L x e3 e4)
-  | SR_Declass : forall e1 e2 Label,
-      shape_rel e1 e2 ->
-      shape_rel (tm_declass L e1 Label) (tm_declass L e2 Label).
-
-      
 Inductive trace_rel :  L.(carrier) -> trace L -> trace L -> Prop :=
 | Decl_Pub : forall (l1 l2 o: L.(carrier)) v1 v2 (tr1 tr2 : trace L),
     trace_rel o tr1 tr2 ->
@@ -57,12 +36,6 @@ Inductive trace_rel :  L.(carrier) -> trace L -> trace L -> Prop :=
   tr1 = [] ->
   tr2 = [] ->
   trace_rel o tr1 tr2.
-  
-Inductive smap_shape_rel : smap -> smap -> Prop :=
-  | SMap_Empty : smap_shape_rel [] []
-  | SMap_Cons : forall x n1 n2 g1 g2,
-    smap_shape_rel g1 g2 ->
-    smap_shape_rel ((x, n1) :: g1) ((x, n2) :: g2).
 
 Definition filter_smap (g : smap) (x : string) : smap :=
   filter (fun y => negb (String.eqb (fst y) x)) g.
@@ -108,86 +81,8 @@ induction g.
 }
 Qed.
 
-Lemma smap_shape_rel_filter :
-  forall g1 g2 x,
-    smap_shape_rel g1 g2 ->
-    smap_shape_rel (filter (fun y => negb (String.eqb (fst y) x)) g1)
-                   (filter (fun y => negb (String.eqb (fst y) x)) g2).
-Proof.
-  intros g1 g2 x Hrel.
-  induction Hrel.
-  - simpl. constructor.
-  - simpl. destruct (String.eqb x0 x) eqn:Heq.
-    * apply IHHrel.
-    * constructor. apply IHHrel.
-Qed.
 
-Lemma shape_rel_filter :
-  forall g1 g2 x e,
-    shape_rel (subst_many L g1 e) (subst_many L g2 e) ->
-    shape_rel
-      (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g1) e)
-      (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g2) e).
-Proof.
-  intros g1 g2 x e.
-  generalize dependent g1.
-  generalize dependent g2.
-  induction e; intros g1 g2 Hrel; simpl.
-  - rewrite subst_many_var.
-    rewrite subst_many_var.
-    destruct (String.eqb x s) eqn:Heq.
-    + apply String.eqb_eq in Heq. subst s.
-    simpl. admit.
-    + rewrite subst_many_var in Hrel.
-      rewrite subst_many_var in Hrel.
-      admit.
-  - rewrite subst_many_val.
-    rewrite subst_many_val.
-    constructor.
-  - rewrite subst_many_tm_bin.
-    rewrite subst_many_tm_bin.
-    inversion Hrel; subst.
-    * constructor.
-Admitted.
-
-
-    
-
-Lemma subst_same_shape : 
-  forall g1 g2 e,
-  shape_rel (subst_many L g1 e) (subst_many L g2 e).
-Proof.
-  intros g1 g2 e. 
-  induction e; simpl.
-  - rewrite subst_many_var.
-    rewrite subst_many_var.
-    induction lookup; induction lookup; try constructor.
-  - rewrite subst_many_val.
-    rewrite subst_many_val.
-    constructor.
-  - rewrite subst_many_tm_bin. 
-    rewrite subst_many_tm_bin.
-    constructor. 
-    apply IHe1. 
-    apply IHe2.
-  - rewrite subst_many_un.
-    rewrite subst_many_un.
-    constructor.
-    apply IHe. 
-  - rewrite subst_many_let.
-    rewrite subst_many_let.
-    constructor.
-    * apply IHe1.
-    * specialize (shape_rel_filter g1 g2 s e2) as Hfilt.
-      specialize (Hfilt IHe2).
-      apply Hfilt.
-  - rewrite subst_many_declass.
-    rewrite subst_many_declass.
-    constructor.
-    apply IHe.
-Qed.      
-
-Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
+Definition subst_rel (o : L.(carrier)) : context L -> smap -> smap -> Prop :=
   fun G g1 g2 =>
     forall (x : string),
       match lookup G x, lookup g1 x, lookup g2 x with
@@ -196,7 +91,7 @@ Definition subst_rel (o : L.(carrier)) : context -> smap -> smap -> Prop :=
             type_rel o t v1 v2
         | Some t, _, _ => False end.
             
-Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Prop  :=
+Definition has_sem_type (o : L.(carrier)) : context L -> tm L -> type L -> Prop  :=
   fun Gamma e t =>
     forall g1 g2 v1 v2 tr1 tr2,
       subst_rel o Gamma g1 g2 ->
@@ -205,30 +100,8 @@ Definition has_sem_type (o : L.(carrier)) : context -> tm L -> L.(carrier) -> Pr
       big_eval L (subst_many L g2 e) v2 tr2 ->
       type_rel o t v1 v2.
 
-Lemma subst_rel_update:
-  forall (o t : L.(carrier)) (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat),
-    type_rel o t v1 v2 ->
-    subst_rel o Gamma g1 g2 ->
-    subst_rel o (update Gamma x t)
-      (update g1 x v1)
-      (update g2 x v2).
-  intros.
-  unfold subst_rel.
-  intro. 
-  unfold update. 
-  simpl. 
-  destruct (x0 =? x)%string eqn:H_string.
-  {
-    apply H. 
-  }
-  {
-    unfold subst_rel in H0.
-    apply H0.
-  }  
-Qed.
-
 Lemma subst_rel_after_update:
-  forall (Gamma : context) (g1 g2 : smap) (x : string) (v1 v2 : nat) (o t : L.(carrier)),
+  forall (Gamma : context L) (g1 g2 : smap) (x : string) (v1 v2 : value) (o : L.(carrier)) (t : type L),
     type_rel o t v1 v2 ->
     subst_rel o Gamma g1 g2 ->
     subst_rel o (update Gamma x t)
@@ -265,154 +138,6 @@ Lemma subst_rel_after_update:
     apply H0.
   }
 Qed.
-
-Fixpoint count_declass (t : tm L) : nat :=
-  match t with
-  | tm_var _ _ => 0
-  | tm_val _ _ => 0
-  | tm_un _ e => count_declass e
-  | tm_bin _ e1 e2 => count_declass e1 + count_declass e2
-  | tm_let _ _ e1 e2 => count_declass e1 + count_declass e2
-  | tm_declass _ e _ => 1 + count_declass e
-  end.
-
-Lemma count_declass_subst :
-  forall x v e,
-    count_declass (subst L x v e) = count_declass e.
-Proof.
-  intros e1 e2 H.
-  induction H; simpl.
-  - induction (e1 =? s)%string.
-    * constructor.
-    * constructor.
-  - reflexivity.
-  - rewrite IHtm1. rewrite IHtm2. reflexivity.
-  - rewrite IHtm. reflexivity.
-  - rewrite <- IHtm1. rewrite <- IHtm2.
-    induction (e1 =? s)%string.
-    * rewrite IHtm1. rewrite IHtm2. reflexivity.
-    * reflexivity.
-  - rewrite IHtm. reflexivity.
-Qed.
-
-Lemma eval_trace_matches_declass_count :
-  forall e v tr,
-    big_eval L e v tr ->
-    length tr = count_declass e.
-Proof.
-  intros e v tr Heval.
-  induction Heval; simpl.
-  - reflexivity.
-  - assumption.
-  - rewrite app_length.
-    rewrite IHHeval1.
-    rewrite IHHeval2.
-    reflexivity.
-  - rewrite app_length.
-    rewrite IHHeval1, IHHeval2.
-    rewrite count_declass_subst.
-    reflexivity.
-  - rewrite IHHeval.
-    reflexivity.
-Qed.
-
-Lemma count_declass_preserved_by_shape_rel :
-  forall e1 e2,
-    shape_rel e1 e2 ->
-    count_declass e1 = count_declass e2.
-Proof.
-  intros e1 e2 H.
-  induction H; simpl.
-  - reflexivity.
-  - reflexivity.
-  - reflexivity.
-  - reflexivity.
-  - apply IHshape_rel.
-  - rewrite IHshape_rel1.
-    rewrite IHshape_rel2.
-    reflexivity.
-  - rewrite IHshape_rel1.
-    rewrite IHshape_rel2.
-    reflexivity.
-  - rewrite IHshape_rel.
-    reflexivity.
-Qed.
-
-Lemma big_eval_trace_length:
-  forall e1 e2 v1 v2 tr1 tr2,
-  shape_rel e1 e2 ->
-  big_eval L e1 v1 tr1 ->
-  big_eval L e2 v2 tr2 ->
-  length tr1 = length tr2.
-Proof.
-  intros e1 e2 v1 v2 tr1 tr2 Hshape Heval1 Heval2.
-  pose proof eval_trace_matches_declass_count _ _ _ Heval1 as Hlen1.
-  pose proof eval_trace_matches_declass_count _ _ _ Heval2 as Hlen2.
-  pose proof count_declass_preserved_by_shape_rel _ _ Hshape as Hcount.
-  rewrite Hlen1. rewrite Hlen2. apply Hcount.
-Qed.
-
-Lemma big_eval_trace :
-   forall e g1 g2 v1 v2 tr1 tr2,
-   big_eval L (subst_many L g1 e) v1 tr1 ->
-   big_eval L (subst_many L g2 e) v2 tr2 ->
-   shape_rel (subst_many L g1 e) (subst_many L g2 e) ->
-   length tr1 = length tr2.
-Proof.
-  intros e g1 g2 v1 v2 tr1 tr2 h1 h2 h3.
-  inversion h1; subst.
-  rewrite <- H0 in h3;
-  inversion h3; subst.
-  - rewrite <- H in h3.
-    rewrite <- H in h2.
-    inversion h2; subst.
-  - rewrite <- H in h3.
-    rewrite <- H in h2.
-    inversion h2; subst.
-    reflexivity.
-  - rewrite <- H in h3. 
-    inversion h3; subst.
-    rewrite <- H in h1.
-    rewrite <- H2 in h2.
-    inversion h2; subst.
-    rewrite <- H2 in h3.
-    specialize (big_eval_trace_length (tm_un L e0) (tm_un L e2) (f_un v) (f_un v0) tr1 tr2) as hb_length.
-    specialize (hb_length h3 h1 h2).
-    apply hb_length.
-  - rewrite <- H in h3.
-    inversion h3; subst.
-    rewrite <- H in h1.
-    rewrite <- H4 in h2.
-    inversion h2; subst.
-    rewrite <- H4 in h3.
-    specialize (big_eval_trace_length (tm_bin L e1 e2) (tm_bin L e4 e5) (f_bin v0 v3)  (f_bin v1 v4) (tr0 ++ tr3) (tr1 ++ tr4)) as hb_length.
-    specialize (hb_length h3 h1 h2).
-    apply hb_length.
-  - rewrite <- H in h3.
-    inversion h3; subst.
-    rewrite <- H in h1.
-    rewrite <- H6 in h2.
-    inversion h2; subst.
-    rewrite <- H6 in h3.
-    specialize (big_eval_trace_length (tm_let L x e1 e2) (tm_let L x e4 e5) v1 v2 (tr0 ++ tr3) (tr1 ++ tr4)) as hb_length.
-    specialize (hb_length h3 h1 h2).
-    apply hb_length.
-  - rewrite <- H in h3.
-    inversion h3; subst.
-    rewrite <- H in h1.
-    rewrite <- H4 in h2.
-    rewrite <- H4 in h3.
-    specialize (big_eval_trace_length (tm_declass L e0 L0) (tm_declass L e2 L0) v1 v2 ((v1, L0) :: tr) tr2) as hb_length.
-    specialize (hb_length h3 h1 h2).
-    apply hb_length.
-Qed.
-
-Lemma trace_rel_tail
-      (l1 l2 o : L.(carrier)) (v1 v2 : nat) (tr0 tr1 : trace L) :
-  trace_rel o ((v1,l1) :: tr0) ((v2,l2) :: tr1) ->
-  trace_rel o tr0 tr1.
-Proof.
-Admitted.
 
 Lemma trace_rel_length :
   forall o tr1 tr2,
@@ -463,25 +188,12 @@ Proof.
   - destruct a; simpl; destruct (String.eqb s0 x) eqn:H_s0_x0; simpl.
     + apply IHg.
     + rewrite (subst_neq_id_commute L x s v n e).
-      rewrite (subst_neq_id_commute L x s0 v n0 (subst L s n e)).
-      apply (subst_many_subst_commute L x v g (subst L s0 n0 (subst L s n e))).
+      rewrite (subst_neq_id_commute L x s0 v v0 (subst L s n e)).
+      apply (subst_many_subst_commute L x v g (subst L s0 v0 (subst L s n e))).
       apply String.eqb_neq in H_s0_x0.
       apply id_neq_sym in H_s0_x0; exact H_s0_x0.
       exact H.
 Qed.
-
-Lemma subst_many_update_split :
-  forall g x v e,
-    subst_many L (update (filter (fun y => negb (String.eqb (fst y) x)) g) x v) e
-    = subst L x v (subst_many L (filter (fun y => negb (String.eqb (fst y) x)) g) e).
-Proof.
-  intros g x v e.
-  induction g as [| [y n] g' IH]; simpl.
-  - reflexivity.
-  - destruct (String.eqb y x) eqn:Heq.
-    + apply IH.
-    + simpl. admit.
-Admitted.
 
 Lemma trace_rel_split :
   forall o e g1 g2 v1 v2 tr1 tr2 tr3 tr4,
@@ -512,13 +224,13 @@ intros. revert g1 g2 v1 v2 tr1 tr2 tr3 tr4 H H0 H1. induction e.
 }
 {
   intros.
-  rewrite subst_many_tm_bin in H0, H1.
+  rewrite subst_many_tm_bin_and in H0, H1.
   inversion H0; subst. inversion H1; subst.
-  specialize (IHe1 g1 g2 v0 v1 tr0 (tr5++tr2) tr1 (tr6++tr4)).
+  specialize (IHe1 g1 g2 v0 v4 tr0 (tr5++tr2) tr1 (tr6++tr4)).
   repeat rewrite <- app_assoc in H.
   specialize (IHe1 H H4 H6).
   inversion IHe1; subst. 
-  specialize (IHe2 g1 g2 v3 v4 tr5 tr2 tr6 tr4).
+  specialize (IHe2 g1 g2 v3 v5 tr5 tr2 tr6 tr4).
   destruct IHe1 as [IHe11 IHe12].
   specialize (IHe2 IHe12).
   specialize (IHe2 H5 H7).
@@ -531,10 +243,48 @@ intros. revert g1 g2 v1 v2 tr1 tr2 tr3 tr4 H H0 H1. induction e.
 }
 {
   intros.
-  rewrite subst_many_un in H0, H1.
+  rewrite subst_many_tm_bin_add in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe1 g1 g2 v0 v4 tr0 (tr5++tr2) tr1 (tr6++tr4)).
+  repeat rewrite <- app_assoc in H.
+  specialize (IHe1 H H4 H6).
+  inversion IHe1; subst. 
+  specialize (IHe2 g1 g2 v3 v5 tr5 tr2 tr6 tr4).
+  destruct IHe1 as [IHe11 IHe12].
+  specialize (IHe2 IHe12).
+  specialize (IHe2 H5 H7).
+  destruct IHe2 as [IHe21 IHe22].
+  split.
+  - apply trace_rel_app.
+    * assumption.
+    * assumption. 
+  - apply IHe22. 
+}
+{
+  intros.
+  rewrite subst_many_tm_bin_or in H0, H1.
+  inversion H0; subst. inversion H1; subst.
+  specialize (IHe1 g1 g2 v0 v4 tr0 (tr5++tr2) tr1 (tr6++tr4)).
+  repeat rewrite <- app_assoc in H.
+  specialize (IHe1 H H4 H6).
+  inversion IHe1; subst. 
+  specialize (IHe2 g1 g2 v3 v5 tr5 tr2 tr6 tr4).
+  destruct IHe1 as [IHe11 IHe12].
+  specialize (IHe2 IHe12).
+  specialize (IHe2 H5 H7).
+  destruct IHe2 as [IHe21 IHe22].
+  split.
+  - apply trace_rel_app.
+    * assumption.
+    * assumption. 
+  - apply IHe22.  
+}
+{
+  intros.
+  rewrite subst_many_un_not in H0, H1.
   inversion H0; subst. inversion H1; subst.
   specialize (IHe g1 g2 v v0 tr1 tr2 tr3 tr4).
-  specialize (IHe H H3 H4).
+  specialize (IHe H H3 H5).
   destruct IHe as [IHe1 IHe2].
   split; assumption.
 }
@@ -590,11 +340,11 @@ Lemma H_update_subst_equiv :
   - destruct a; simpl.
   destruct (negb (String.eqb s x)) eqn:H_eq; simpl.
   + apply Bool.negb_true_iff in H_eq; apply String.eqb_neq in H_eq.
-  intros v e; specialize (H_pull_out_inner_subst x v s n e g); auto.
+  intros v0 e; specialize (H_pull_out_inner_subst x v0 s v e g); auto.
   + apply IHg.
 Qed.
 
-Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : trace L):
+Theorem noninterference (o : L.(carrier)) (t : type L) (G : context L) (e: tm L) (tr1 tr2 : trace L):
   has_type L G e t ->
   has_sem_type o G e t.
   intros h.
@@ -619,77 +369,191 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
     rewrite subst_many_val in h3.
     inversion h2; subst.
     inversion h3; subst.
-    apply TR_Low.
+    apply TR_Low_Nat.
   }
   {
     unfold has_sem_type.
     intros g1 g2 v1 v2 tr_1 tr_2 h1 rel h2 h3.
-    rewrite subst_many_un in h2.
-    rewrite subst_many_un in h3.
+    rewrite subst_many_val in h2.
+    rewrite subst_many_val in h3.
     inversion h2; subst.
     inversion h3; subst.
-
-    destruct (IHh g1 g2 v v0 tr_1 tr_2 h1 rel H0 H1); subst; constructor.
-    apply H.
+    apply TR_Low_Bool.
+  }
+  {
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 tr_1 tr_2 h1 rel h2 h3.
+    rewrite subst_many_un_not in h2.
+    rewrite subst_many_un_not in h3.
+    inversion h2; subst.
+    inversion h3; subst.
+    unfold has_sem_type in IHh.
+    specialize (IHh g1 g2 v v0 tr_1 tr_2 h1 rel H0 H2).
+    destruct IHh.
+    - discriminate.
+    - rewrite <- H1 in H3. 
+      inversion H3; subst. 
+      inversion H1; subst. 
+      apply TR_Low_Bool.
+    - discriminate.
+    - inversion H3; subst.    
+      inversion H1; subst.
+      apply TR_High_Bool.  
+      apply H.
   }
   {
     unfold has_sem_type.
     intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
-    rewrite subst_many_tm_bin in h_eval1.
-    rewrite subst_many_tm_bin in h_eval2.
+    rewrite subst_many_tm_bin_and in h_eval1.
+    rewrite subst_many_tm_bin_and in h_eval2.
     inversion h_eval1; subst.
     inversion h_eval2; subst.
-    unfold has_sem_type in IHh1.
     assert (trace_rel o tr0 tr4) as Hqn1. {
-      pose proof (trace_rel_split o e1 g1 g2 v0 v1 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
+      pose proof (trace_rel_split o e1 g1 g2 v0 v4 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
       apply H0rel.
     }
     assert (trace_rel o tr3 tr5) as Hqn2. {
-      pose proof (trace_rel_split o e1 g1 g2 v0 v1 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
+      pose proof (trace_rel_split o e1 g1 g2 v0 v4 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
       apply H.
     }
 
-    destruct (IHh1 g1 g2 v0 v1 tr0 tr4 h_sub Hqn1 H1 H3); subst.
-    destruct (IHh2 g1 g2 v3 v4 tr3 tr5 h_sub Hqn2 H2 H4); subst.
-    - simpl.
-      constructor.
-    - simpl.
-      constructor.
-      specialize(L.(return_max) t t0). intros.
-      destruct H0.
+    unfold has_sem_type in IHh1.
+    unfold has_sem_type in IHh2.
+
+    specialize (IHh1 g1 g2 v0 v4 tr0 tr4 h_sub Hqn1 H1 H3); subst;
+    inversion IHh1; subst;
+    specialize (IHh2 g1 g2 v3 v5 tr3 tr5 h_sub Hqn2 H2 H4); subst;
+    inversion IHh2; subst.
+    - inversion H5; subst.
+      inversion H8; subst.
+      apply TR_Low_Bool.
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
       {
-       rewrite H0. 
-       specialize(L.(max_le) t0 o t). 
+       rewrite H. 
+       specialize(L.(max_le) l2 o l1). 
        intros. 
-       rewrite H in H5. 
-       rewrite H0 in H5. 
-       specialize (H5 eq_refl eq_refl).
-       apply H5. 
+       rewrite H6 in H0. 
+       rewrite H in H0. 
+       specialize (H0 eq_refl eq_refl).
+       apply TR_High_Bool.
+       apply H0. 
       }
       {
-       rewrite H0. apply H. 
+        rewrite H.
+        apply TR_High_Bool.
+        apply H6.  
       }
-      
-    -simpl.
-     constructor. 
-     specialize(L.(return_max) t t2).
-     intros.
-     destruct H0.
-     {
-      rewrite H0.
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      {
+        rewrite H.
+        apply TR_High_Bool.
+        apply H6.
+      }
+      {
+       rewrite H.
+       apply TR_High_Bool.
+       specialize(L.(max_le) l1 o l2); intros.
+       rewrite order_max in H.
+       specialize(H0 H6 H).
+       apply H0.       
+      }
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      {
+       rewrite H. 
+       apply TR_High_Bool.
+       apply H6.
+      }
+      {
+       rewrite H.
+       apply TR_High_Bool.
+       apply H7. 
+      }
+  }
+  {
+    unfold has_sem_type.
+    intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
+    rewrite subst_many_tm_bin_add in h_eval1.
+    rewrite subst_many_tm_bin_add in h_eval2.
+    inversion h_eval1; subst.
+    inversion h_eval2; subst.
+    assert (trace_rel o tr0 tr4) as Hqn1. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v4 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
+      apply H0rel.
+    }
+    assert (trace_rel o tr3 tr5) as Hqn2. {
+      pose proof (trace_rel_split o e1 g1 g2 v0 v4 tr0 tr3 tr4 tr5 rel H1 H3) as [H0rel].
       apply H.
-     }
-     {
-      rewrite H0.
-      specialize(L.(max_le) t o t2).
-      intros. 
-      rewrite H in H5. 
-      specialize (L.(order_max) t2 t); intros.
-      rewrite H6 in H5.
-      rewrite H0 in H5.
-      specialize (H5 eq_refl eq_refl).
-      apply H5.
-     }
+    }
+
+    unfold has_sem_type in IHh1.
+    unfold has_sem_type in IHh2.
+
+    specialize (IHh1 g1 g2 v0 v4 tr0 tr4 h_sub Hqn1 H1 H3); subst;
+    inversion IHh1; subst;
+    specialize (IHh2 g1 g2 v3 v5 tr3 tr5 h_sub Hqn2 H2 H4); subst;
+    inversion IHh2; subst.
+    - inversion H5; subst.
+      inversion H8; subst.
+      apply TR_Low_Nat.
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      {
+       rewrite H. 
+       specialize(L.(max_le) l2 o l1). 
+       intros. 
+       rewrite H6 in H0. 
+       rewrite H in H0. 
+       specialize (H0 eq_refl eq_refl).
+       apply TR_High_Nat.
+       apply H0. 
+      }
+      {
+        rewrite H.
+        apply TR_High_Nat.
+        apply H6.  
+      }
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      {
+        rewrite H.
+        apply TR_High_Nat.
+        apply H6.
+      }
+      {
+       rewrite H.
+       apply TR_High_Nat.
+       specialize(L.(max_le) l1 o l2); intros.
+       rewrite order_max in H.
+       specialize(H0 H6 H).
+       apply H0.       
+      }
+    - inversion H5; subst.
+      inversion H8; subst.
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      {
+       rewrite H. 
+       apply TR_High_Nat.
+       apply H6.
+      }
+      {
+       rewrite H.
+       apply TR_High_Nat.
+       apply H7. 
+      }
   }
   {
     unfold has_sem_type.
@@ -749,39 +613,67 @@ Theorem noninterference (o t : L.(carrier)) (G : context) (e: tm L) (tr1 tr2 : t
       inversion rel.
       
       unfold has_sem_type in IHh.
-      destruct (IHh g1 g2 v1 v2 tr tr0 h_sub H6 H3 H4).
-      -apply TR_Low.
-      -destruct (L.(le) Label t) eqn:Hlt.
-        *destruct (L.(le) Label o0) eqn:Hlt2.
+      specialize (IHh g1 g2 v1 v2 tr tr0 h_sub H6 H3 H4).
+      inversion IHh; subst.
+      -apply TR_Low_Nat.
+      -destruct (L.(le) Label l) eqn:Hlt.
+        *destruct (L.(le) Label o) eqn:Hlt2.
          {
-          subst. apply TR_Low.
+          subst. rewrite H15. apply TR_Low_Nat.
          }
          {
-          subst. apply TR_Low.
+          subst. rewrite H15. apply TR_Low_Nat.
          }
-        *destruct (L.(le) Label o0) eqn:Hlt2.
+        *destruct (L.(le) Label o) eqn:Hlt2.
          {
-          subst. apply TR_Low.
+          subst. rewrite H15. apply TR_Low_Nat.
          }
          {
-          subst. apply TR_Low.
+          subst. rewrite H15. apply TR_Low_Nat.
          }
-      -destruct (L.(le) Label t) eqn:Hlt.
-        *destruct (L.(le) Label o0) eqn:Hlt2.
-        {
-         subst. constructor. destruct H9 as [H91 H92]. apply H91.
-        }
-        {
-          subst. constructor. apply Hlt2.
-        }
-        *destruct (L.(le) Label o0) eqn:Hlt2.
-        {
-          subst. constructor. destruct H9 as [H91 H92]. apply H91.
-        }
-        {
-          subst. constructor. apply Hlt2.
-        }
-      -discriminate.
+      - specialize (IHh g1 g2 v1 v2 tr tr0 h_sub H2 H3 H4).
+        inversion IHh; subst.
+        * apply TR_Low_Nat.
+        * apply TR_High_Nat.
+          destruct H9 as [H91 H92].
+          apply H91.
+      - discriminate.
+    }
+    {
+      unfold has_sem_type.
+      intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
+      rewrite subst_many_declass in h_eval1.
+      rewrite subst_many_declass in h_eval2.
+      inversion h_eval1; subst. 
+      inversion h_eval2; subst.
+      inversion rel.
+      
+      unfold has_sem_type in IHh.
+      specialize (IHh g1 g2 v1 v2 tr tr0 h_sub H6 H3 H4).
+      inversion IHh; subst.
+      -apply TR_Low_Bool.
+      -destruct (L.(le) Label l) eqn:Hlt.
+        *destruct (L.(le) Label o) eqn:Hlt2.
+         {
+          subst. rewrite H15. apply TR_Low_Bool.
+         }
+         {
+          subst. rewrite H15. apply TR_Low_Bool.
+         }
+        *destruct (L.(le) Label o) eqn:Hlt2.
+         {
+          subst. rewrite H15. apply TR_Low_Bool.
+         }
+         {
+          subst. rewrite H15. apply TR_Low_Bool.
+         }
+      - specialize (IHh g1 g2 v1 v2 tr tr0 h_sub H2 H3 H4).
+        inversion IHh; subst.
+        * apply TR_Low_Bool.
+        * apply TR_High_Bool.
+          destruct H9 as [H91 H92].
+          apply H91.
+      - discriminate.
     }
 Qed.
 
