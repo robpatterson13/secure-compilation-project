@@ -29,7 +29,8 @@ Inductive tm : Type :=
 | tm_bin_or : tm -> tm -> tm
 | tm_un_not : tm -> tm
 | tm_let : string -> tm -> tm -> tm
-| tm_declass : tm -> L.(carrier) -> tm.
+| tm_declass : tm -> L.(carrier) -> tm
+| tm_if : tm -> tm -> tm -> tm.
 
 Fixpoint subst (x : string) (s : value) (t : tm) : tm :=
   match t with
@@ -43,6 +44,7 @@ Fixpoint subst (x : string) (s : value) (t : tm) : tm :=
       let body := if String.eqb x x_b then b else (subst x s b) in
       tm_let x_b (subst x s e) body
   | tm_declass t l => tm_declass (subst x s t) l
+  | tm_if b t1 t2 => tm_if (subst x s b)  (subst x s t1)  (subst x s t2)
   end.
 
 Definition smap : Type := list (string * value).
@@ -123,7 +125,17 @@ Inductive big_eval : tm -> value -> trace -> Prop :=
   big_eval (tm_let x e1 e2) v2 (tr1 ++ tr2)
 | Etm_declass : forall e v tr L,
   big_eval e v tr ->
-  big_eval (tm_declass e L) v ((v, L) :: tr). 
+  big_eval (tm_declass e L) v ((v, L) :: tr) 
+| Etm_if_true : forall b t1 t2 v1 v2 tr1 tr2 tr3,
+  big_eval b (VBool true) tr1 ->
+  big_eval t1 v1 tr2 ->
+  big_eval t2 v2 tr3 ->
+  big_eval (tm_if b t1 t2) v1 (tr1 ++ tr2) 
+| Etm_if_false : forall b t1 t2 v1 v2 tr1 tr2 tr3,
+  big_eval b (VBool false) tr1 ->
+  big_eval t1 v1 tr2 ->
+  big_eval t2 v2 tr3 ->
+  big_eval (tm_if b t1 t2) v2 (tr1 ++ tr3). 
 
   Theorem big_eval_det (t : tm) (v1 v2 : value) (tr1 tr2 : trace) : 
   big_eval t v1 tr1 ->
@@ -188,6 +200,22 @@ Inductive big_eval : tm -> value -> trace -> Prop :=
     specialize (IHh1 _ _ H3); subst.
     reflexivity.
   }
+  {
+    intros v3 tr_2 h2.
+    inversion h2; subst.
+    - specialize(IHh1_2 v3 tr4 H5).
+      apply IHh1_2.
+    - specialize (IHh1_1 (VBool false) tr0 H2).
+      discriminate.
+  }
+  {
+    intros v3 tr_2 h2.
+    inversion h2; subst.
+    - specialize (IHh1_1 (VBool true) tr0 H2).
+      discriminate.
+    - specialize(IHh1_3 v3 tr5 H6).
+      apply IHh1_3.
+  }
 Qed.
 
 Lemma subst_many_val g v : 
@@ -222,6 +250,18 @@ Lemma subst_many_tm_bin_or g e1 e2 :
   simpl.
   destruct a.
   intros e1 e2.
+  rewrite IHg; reflexivity.
+Qed.
+
+Lemma subst_many_if g b e1 e2 : 
+  subst_many g (tm_if b e1 e2) = 
+    tm_if (subst_many g b) (subst_many g e1) (subst_many g e2).
+  revert b e1 e2. 
+  induction g.
+  simpl; reflexivity.
+  simpl.
+  destruct a.
+  intros b e1 e2.
   rewrite IHg; reflexivity.
 Qed.
 
@@ -305,6 +345,7 @@ Lemma subst_eq_id_erasure:
     + reflexivity.
     + rewrite IHe2; reflexivity.
   - rewrite IHe. reflexivity.
+  - rewrite IHe1. rewrite IHe2. rewrite IHe3. reflexivity.
 Qed.
 
 Lemma id_neq_sym:
@@ -348,6 +389,7 @@ Lemma subst_neq_id_commute:
     destruct (String.eqb x s0); destruct (String.eqb s s0); subst; try reflexivity.
     + simpl; rewrite IHe2; reflexivity.
   -simpl. rewrite IHe. reflexivity.
+  -simpl. rewrite IHe1. rewrite IHe2. rewrite IHe3. reflexivity.
 Qed.
 
 Lemma subst_many_subst_commute:

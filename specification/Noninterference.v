@@ -675,6 +675,156 @@ Theorem noninterference (o : L.(carrier)) (t : type L) (G : context L) (e: tm L)
           apply H91.
       - discriminate.
     }
+    {
+      unfold has_sem_type.
+      intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
+      rewrite subst_many_if in h_eval1.
+      rewrite subst_many_if in h_eval2.
+      inversion h_eval1; subst; 
+      inversion h_eval2; subst.
+      - unfold has_sem_type in IHh1.
+        unfold has_sem_type in IHh2.
+        unfold has_sem_type in IHh3.
+        
+        assert (trace_rel o tr3 tr6) as Hqn2. {
+          pose proof (trace_rel_split o b g1 g2 (VBool true) (VBool true) tr0 tr3 tr5 tr6 rel H2 H3) as [H0rel].
+          apply H.
+        }
+
+        specialize(IHh2 g1 g2 v1 v2 tr3 tr6 h_sub Hqn2 H5 H8).
+        specialize(L.(return_max) l1 l2). intros.
+        destruct H.
+        * rewrite H. apply IHh2.
+        * rewrite H.
+          inversion IHh2; subst.
+          {
+            apply TR_Low_Nat.  
+          }
+          {
+            apply TR_High_Nat. 
+            specialize (L.(order_max) l1 l2). intros. rewrite H0 in H.
+            specialize (L.(max_le) l1 o l2 H4 H). intros. apply H1.  
+          }
+    - unfold has_sem_type in IHh1.
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool true) (VBool false) tr0 tr3 tr5 tr7 rel H2 H3) as [H0rel _].
+        assumption.
+      }
+      specialize(IHh1 g1 g2 (VBool true) (VBool false) tr0 tr5 h_sub Hqn1 H2 H3).
+      inversion IHh1; subst. specialize(L.(bot_le) o). intros. rewrite H in H7. discriminate.
+    - unfold has_sem_type in IHh1.
+
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool true) tr0 tr4 tr5 tr6 rel H2 H3) as [H0rel _].
+        assumption.
+      }
+
+      specialize(IHh1 g1 g2 (VBool false) (VBool true) tr0 tr5 h_sub Hqn1 H2 H3).
+      inversion IHh1; subst. specialize(L.(bot_le) o). intros. rewrite H in H7.
+      discriminate.
+    - unfold has_sem_type in IHh1.
+      unfold has_sem_type in IHh2.
+      unfold has_sem_type in IHh3.
+
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool false) tr0 tr4 tr5 tr7 rel H2 H3) as [H0rel].
+        apply H0rel.
+      }
+
+      assert (trace_rel o tr4 tr7) as Hqn2. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool false) tr0 tr4 tr5 tr7 rel H2 H3) as [H0rel].
+        apply H.
+      }
+
+      specialize(IHh3 g1 g2 v1 v2 tr4 tr7 h_sub Hqn2 H6 H9).
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      * rewrite H. 
+        inversion IHh3; subst.
+        {
+          apply TR_Low_Nat. 
+        }
+        {
+          apply TR_High_Nat.
+          specialize (L.(max_le) l2 o l1 H4 H). intros. apply H0.
+        }
+      * rewrite H. assumption.
+    }
+    {
+      unfold has_sem_type.
+      intros g1 g2 v1 v2 tr_1 tr_2 h_sub rel h_eval1 h_eval2.
+      rewrite subst_many_if in h_eval1.
+      rewrite subst_many_if in h_eval2.
+      inversion h_eval1; subst; 
+      inversion h_eval2; subst.
+      - unfold has_sem_type in IHh1.
+        unfold has_sem_type in IHh2.
+        unfold has_sem_type in IHh3.
+        
+        assert (trace_rel o tr3 tr6) as Hqn2. {
+          pose proof (trace_rel_split o b g1 g2 (VBool true) (VBool true) tr0 tr3 tr5 tr6 rel H2 H3) as [H0rel].
+          apply H.
+        }
+
+        specialize(IHh2 g1 g2 v1 v2 tr3 tr6 h_sub Hqn2 H5 H8).
+        specialize(L.(return_max) l1 l2). intros.
+        destruct H.
+        * rewrite H. apply IHh2.
+        * rewrite H.
+          inversion IHh2; subst.
+          {
+            apply TR_Low_Bool.  
+          }
+          {
+            apply TR_High_Bool. 
+            specialize (L.(order_max) l1 l2). intros. rewrite H0 in H.
+            specialize (L.(max_le) l1 o l2 H4 H). intros. apply H1.  
+          }
+    - unfold has_sem_type in IHh1.
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool true) (VBool false) tr0 tr3 tr5 tr7 rel H2 H3) as [H0rel _].
+        assumption.
+      }
+      specialize(IHh1 g1 g2 (VBool true) (VBool false) tr0 tr5 h_sub Hqn1 H2 H3).
+      inversion IHh1; subst. specialize(L.(bot_le) o). intros. rewrite H in H7. discriminate.
+    - unfold has_sem_type in IHh1.
+
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool true) tr0 tr4 tr5 tr6 rel H2 H3) as [H0rel _].
+        assumption.
+      }
+
+      specialize(IHh1 g1 g2 (VBool false) (VBool true) tr0 tr5 h_sub Hqn1 H2 H3).
+      inversion IHh1; subst. specialize(L.(bot_le) o). intros. rewrite H in H7.
+      discriminate.
+    - unfold has_sem_type in IHh1.
+      unfold has_sem_type in IHh2.
+      unfold has_sem_type in IHh3.
+
+      assert (trace_rel o tr0 tr5) as Hqn1. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool false) tr0 tr4 tr5 tr7 rel H2 H3) as [H0rel].
+        apply H0rel.
+      }
+
+      assert (trace_rel o tr4 tr7) as Hqn2. {
+        pose proof (trace_rel_split o b g1 g2 (VBool false) (VBool false) tr0 tr4 tr5 tr7 rel H2 H3) as [H0rel].
+        apply H.
+      }
+
+      specialize(IHh3 g1 g2 v1 v2 tr4 tr7 h_sub Hqn2 H6 H9).
+      specialize(L.(return_max) l1 l2). intros.
+      destruct H.
+      * rewrite H. 
+        inversion IHh3; subst.
+        {
+          apply TR_Low_Bool. 
+        }
+        {
+          apply TR_High_Bool.
+          specialize (L.(max_le) l2 o l1 H4 H). intros. apply H0.
+        }
+      * rewrite H. assumption.
+    }
 Qed.
 
 End Noninterference.

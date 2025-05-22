@@ -47,7 +47,17 @@ Inductive has_type : context -> tm L -> type -> Prop :=
     has_type Gamma (tm_declass L e Label) (nat_L Label)
 | T_Declass_Bool : forall Gamma e l Label,
     has_type Gamma e (bool_L l) ->
-    has_type Gamma (tm_declass L e Label) (bool_L Label).
+    has_type Gamma (tm_declass L e Label) (bool_L Label)
+| T_If_Nat : forall Gamma b e1 e2 l1 l2,
+    has_type Gamma b (bool_L L.(bot)) ->
+    has_type Gamma e1 (nat_L l1) ->
+    has_type Gamma e2 (nat_L l2) ->
+    has_type Gamma (tm_if L b e1 e2) (nat_L (L.(max) l1 l2))
+| T_If_Bool : forall Gamma b e1 e2 l1 l2,
+    has_type Gamma b (bool_L L.(bot)) ->
+    has_type Gamma e1 (bool_L l1) ->
+    has_type Gamma e2 (bool_L l2) ->
+    has_type Gamma (tm_if L b e1 e2) (bool_L (L.(max) l1 l2)).
 
 Definition base_max (t1 : ty) (t2 : ty) :=
   match t1, t2 with
