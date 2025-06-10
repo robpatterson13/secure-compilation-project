@@ -2,6 +2,7 @@ ty  : Type
 tm  : Type
 vl : Type
 
+
 int : ty
 unit : ty
 arr  : ty -> ty -> ty 
