@@ -1,16 +1,15 @@
 ty  : Type
 tm  : Type
-vl : Type
 
-
-int : ty
-unit : ty
+bool : ty
 arr  : ty -> ty -> ty 
 
-n : vl
-vunit : vl
-lam : ty -> (bind tm in tm) -> vl
-app : tm -> tm -> tm
-add : tm -> tm -> tm
+true : tm
+false : tm
 
-vt : vl -> tm
+ifthenelse : tm -> tm -> tm -> tm
+lam : ty -> (bind tm in tm) -> tm
+app : tm -> tm -> tm
+
+nat : Type
+num  : nat -> tm

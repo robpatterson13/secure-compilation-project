@@ -2,10 +2,16 @@ Require Import core unscoped stlc.
 Require Import List. 
 Require Import Setoid Morphisms Relation_Definitions.
 
+Definition context := list ty.
+
+Definition lookup (G : context) (x : nat) : option ty :=
+  nth_error G x.
+
 Inductive is_value : tm -> Prop :=
   | v_true : is_value true
   | v_false : is_value false
-  | v_lam : forall T t, is_value (lam T t).
+  | v_lam : forall T t, is_value (lam T t)
+  | v_num : forall n, is_value (num n).
 
 Inductive big_eval : tm -> tm -> Prop := 
 | E_Val : forall e,
@@ -37,6 +43,8 @@ Inductive has_type : context -> tm -> ty -> Prop :=
     has_type Gamma true bool
 | T_False : forall Gamma,
     has_type Gamma false bool
+| T_Num : forall Gamma n,
+    has_type Gamma (num n) nat_ty
 | T_Lam : forall Gamma t1 t2 e,
     has_type (t1 :: Gamma) e t2 ->
     has_type Gamma (lam t1 e) (arr t1 t2)
@@ -52,6 +60,11 @@ Inductive has_type : context -> tm -> ty -> Prop :=
 
 Fixpoint SN_V (T : ty) (v : tm) : Prop :=
   match T with
+  | nat_ty => 
+      match v with
+      | (num v) => v = 0 \/ (exists n, v = (S n))
+      | _ => False
+      end
   | bool => v = true \/ v = false
   | (arr t1 t2) =>
       match v with
@@ -112,6 +125,8 @@ Proof.
   - destruct Hv; subst; constructor.
   - destruct v; try contradiction.
     constructor.
+  - destruct v; try contradiction.
+    constructor.
 Qed.
 
 Lemma sn_one (Gamma : list ty) (e : tm) (t : ty):
@@ -129,10 +144,7 @@ Proof.
     exists (g x).
     split.
     - specialize (SN_V_is_value t1 (g x) H_var) as S_Val.
-      inversion S_Val; subst.
-      * constructor. constructor.
-      * constructor. constructor.
-      * constructor. constructor.
+      inversion S_Val; subst; constructor; constructor.
     - assumption.
   }
   {
@@ -154,6 +166,18 @@ Proof.
    split.
    - constructor. constructor.
    - unfold SN_V. right. reflexivity. 
+  }
+  {
+    unfold has_sem_type.
+    intros.
+    unfold SN_E.
+    asimpl.
+    exists (num n).
+    split.
+    - constructor. constructor.
+    - unfold SN_V. destruct n.
+      * left; reflexivity.
+      * right. exists n. reflexivity.
   }
   {
     unfold has_sem_type.
@@ -229,7 +253,6 @@ Proof.
     - assumption.
   }    
 Qed.
-
 
 Lemma sn_two (e : tm) (t : ty): 
   has_sem_type nil e t ->
