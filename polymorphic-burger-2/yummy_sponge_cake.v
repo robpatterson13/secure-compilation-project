@@ -192,13 +192,21 @@ Definition related_lr (Delta : delta_context) (Gamma : gamma_context) (e1 e2 : t
   (has_type Delta Gamma e1 T) /\ 
   (has_type Delta Gamma e2 T) /\
   (forall p, (SN_D Delta p) ->
-    (forall vs, (SN_G Gamma vs p) ->
+    (forall vs, (SN_G Gamma vs p) ->  
       (SN_E T (subst_tm (p_1 p) (t_1 vs) e1)  (subst_tm (p_2 p) (t_2 vs) e2) p))).
 
 Lemma fundamental : 
   forall Delta Gamma e t,
   (has_type Delta Gamma e t) ->
   (related_lr Delta Gamma e e t).
+Proof.
+Admitted.
+
+Lemma compatability_lemma : 
+  forall Delta t' t p,
+    well_formed_type Delta t' ->
+    well_formed_type (tt :: Delta) t ->
+    (SN_D Delta p).
 Proof.
 Admitted.
 
@@ -242,6 +250,8 @@ specialize (E_A E_TA (E_Val v)). unfold in_rel in H17. inversion H17.
 - inversion H18; subst. specialize (E_A H14). assumption. 
 - contradiction H18.
 Qed. 
+
+
 
 
 
