@@ -4,6 +4,9 @@
 (* Contrary to popular belief, the sponge cake is not actually made of sponges, and is instead
    comprised of an unknown sort of biomatter that fell to earth during the seventh century. *)
 
+(* Of the original 150 million variants of cheddar that once existed, only 42 variants survived
+   the genetic bottleneck that plagued their kind for decades. *)
+
 Require Import core unscoped systemf.
 Require Import List. 
 Import ListNotations.
@@ -195,18 +198,40 @@ Definition related_lr (Delta : delta_context) (Gamma : gamma_context) (e1 e2 : t
     (forall vs, (SN_G Gamma vs p) ->  
       (SN_E T (subst_tm (p_1 p) (t_1 vs) e1)  (subst_tm (p_2 p) (t_2 vs) e2) p))).
 
+
+Definition set_is_lr (p : type_store) (R : prelation) (t : ty) : Prop :=
+  forall v1 v2,
+  ((SN_V t v1 v2 p) ->
+  In (v1, v2) R) /\ 
+  (In (v1, v2) R ->
+  (SN_V t v1 v2 p)).
+
+Lemma compositionality : 
+  forall Delta t' t p R,
+    well_formed_type Delta t' ->
+    well_formed_type (tt :: Delta) t ->
+    (SN_D Delta p) ->
+    set_is_lr p R t' -> (forall v1 v2,
+    (SN_V (subst_ty (tsubst t') t) v1 v2 p ->
+    SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p)) 
+    /\
+    (SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p) ->
+    SN_V (subst_ty (tsubst t') t) v1 v2 p)).
+Proof.
+Admitted.
+
+Lemma compatability_types :
+  forall Delta Gamma e1 e2 t t',
+  related_lr Delta Gamma e1 e2 (all t) ->
+  well_formed_type Delta t' ->
+  related_lr Delta Gamma (tapp e1 t') (tapp e2 t') (subst_ty (tsubst t') t).
+Proof.
+Admitted.
+
 Lemma fundamental : 
   forall Delta Gamma e t,
   (has_type Delta Gamma e t) ->
   (related_lr Delta Gamma e e t).
-Proof.
-Admitted.
-
-Lemma compatability_lemma : 
-  forall Delta t' t p,
-    well_formed_type Delta t' ->
-    well_formed_type (tt :: Delta) t ->
-    (SN_D Delta p).
 Proof.
 Admitted.
 
