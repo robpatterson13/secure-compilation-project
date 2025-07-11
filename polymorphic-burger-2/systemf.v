@@ -9,7 +9,8 @@ Inductive ty : Type :=
   | var_ty : nat -> ty
   | bool : ty
   | arr : ty -> ty -> ty
-  | all : ty -> ty.
+  | all : ty -> ty
+  | ex : ty -> ty.
 
 Lemma congr_bool : bool = bool.
 Proof.
@@ -28,6 +29,11 @@ Proof.
 exact (eq_trans eq_refl (ap (fun x => all x) H0)).
 Qed.
 
+Lemma congr_ex {s0 : ty} {t0 : ty} (H0 : s0 = t0) : ex s0 = ex t0.
+Proof.
+exact (eq_trans eq_refl (ap (fun x => ex x) H0)).
+Qed.
+
 Lemma upRen_ty_ty (xi : nat -> nat) : nat -> nat.
 Proof.
 exact (up_ren xi).
@@ -39,6 +45,7 @@ Fixpoint ren_ty (xi_ty : nat -> nat) (s : ty) {struct s} : ty :=
   | bool => bool
   | arr s0 s1 => arr (ren_ty xi_ty s0) (ren_ty xi_ty s1)
   | all s0 => all (ren_ty (upRen_ty_ty xi_ty) s0)
+  | ex s0 => ex (ren_ty (upRen_ty_ty xi_ty) s0)
   end.
 
 Lemma up_ty_ty (sigma : nat -> ty) : nat -> ty.
@@ -52,6 +59,7 @@ Fixpoint subst_ty (sigma_ty : nat -> ty) (s : ty) {struct s} : ty :=
   | bool => bool
   | arr s0 s1 => arr (subst_ty sigma_ty s0) (subst_ty sigma_ty s1)
   | all s0 => all (subst_ty (up_ty_ty sigma_ty) s0)
+  | ex s0 => ex (subst_ty (up_ty_ty sigma_ty) s0)
   end.
 
 Lemma upId_ty_ty (sigma : nat -> ty) (Eq : forall x, sigma x = var_ty x) :
@@ -74,6 +82,8 @@ subst_ty sigma_ty s = s :=
       congr_arr (idSubst_ty sigma_ty Eq_ty s0) (idSubst_ty sigma_ty Eq_ty s1)
   | all s0 =>
       congr_all (idSubst_ty (up_ty_ty sigma_ty) (upId_ty_ty _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex (idSubst_ty (up_ty_ty sigma_ty) (upId_ty_ty _ Eq_ty) s0)
   end.
 
 Lemma upExtRen_ty_ty (xi : nat -> nat) (zeta : nat -> nat)
@@ -97,6 +107,10 @@ ren_ty xi_ty s = ren_ty zeta_ty s :=
         (extRen_ty xi_ty zeta_ty Eq_ty s1)
   | all s0 =>
       congr_all
+        (extRen_ty (upRen_ty_ty xi_ty) (upRen_ty_ty zeta_ty)
+           (upExtRen_ty_ty _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
         (extRen_ty (upRen_ty_ty xi_ty) (upRen_ty_ty zeta_ty)
            (upExtRen_ty_ty _ _ Eq_ty) s0)
   end.
@@ -125,6 +139,10 @@ subst_ty sigma_ty s = subst_ty tau_ty s :=
       congr_all
         (ext_ty (up_ty_ty sigma_ty) (up_ty_ty tau_ty) (upExt_ty_ty _ _ Eq_ty)
            s0)
+  | ex s0 =>
+      congr_ex
+        (ext_ty (up_ty_ty sigma_ty) (up_ty_ty tau_ty) (upExt_ty_ty _ _ Eq_ty)
+           s0)
   end.
 
 Lemma up_ren_ren_ty_ty (xi : nat -> nat) (zeta : nat -> nat)
@@ -145,6 +163,10 @@ Fixpoint compRenRen_ty (xi_ty : nat -> nat) (zeta_ty : nat -> nat)
         (compRenRen_ty xi_ty zeta_ty rho_ty Eq_ty s1)
   | all s0 =>
       congr_all
+        (compRenRen_ty (upRen_ty_ty xi_ty) (upRen_ty_ty zeta_ty)
+           (upRen_ty_ty rho_ty) (up_ren_ren _ _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
         (compRenRen_ty (upRen_ty_ty xi_ty) (upRen_ty_ty zeta_ty)
            (upRen_ty_ty rho_ty) (up_ren_ren _ _ _ Eq_ty) s0)
   end.
@@ -172,6 +194,10 @@ subst_ty tau_ty (ren_ty xi_ty s) = subst_ty theta_ty s :=
         (compRenSubst_ty xi_ty tau_ty theta_ty Eq_ty s1)
   | all s0 =>
       congr_all
+        (compRenSubst_ty (upRen_ty_ty xi_ty) (up_ty_ty tau_ty)
+           (up_ty_ty theta_ty) (up_ren_subst_ty_ty _ _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
         (compRenSubst_ty (upRen_ty_ty xi_ty) (up_ty_ty tau_ty)
            (up_ty_ty theta_ty) (up_ren_subst_ty_ty _ _ _ Eq_ty) s0)
   end.
@@ -213,6 +239,10 @@ ren_ty zeta_ty (subst_ty sigma_ty s) = subst_ty theta_ty s :=
       congr_all
         (compSubstRen_ty (up_ty_ty sigma_ty) (upRen_ty_ty zeta_ty)
            (up_ty_ty theta_ty) (up_subst_ren_ty_ty _ _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
+        (compSubstRen_ty (up_ty_ty sigma_ty) (upRen_ty_ty zeta_ty)
+           (up_ty_ty theta_ty) (up_subst_ren_ty_ty _ _ _ Eq_ty) s0)
   end.
 
 Lemma up_subst_subst_ty_ty (sigma : nat -> ty) (tau_ty : nat -> ty)
@@ -250,6 +280,10 @@ subst_ty tau_ty (subst_ty sigma_ty s) = subst_ty theta_ty s :=
         (compSubstSubst_ty sigma_ty tau_ty theta_ty Eq_ty s1)
   | all s0 =>
       congr_all
+        (compSubstSubst_ty (up_ty_ty sigma_ty) (up_ty_ty tau_ty)
+           (up_ty_ty theta_ty) (up_subst_subst_ty_ty _ _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
         (compSubstSubst_ty (up_ty_ty sigma_ty) (up_ty_ty tau_ty)
            (up_ty_ty theta_ty) (up_subst_subst_ty_ty _ _ _ Eq_ty) s0)
   end.
@@ -332,6 +366,10 @@ Fixpoint rinst_inst_ty (xi_ty : nat -> nat) (sigma_ty : nat -> ty)
       congr_all
         (rinst_inst_ty (upRen_ty_ty xi_ty) (up_ty_ty sigma_ty)
            (rinstInst_up_ty_ty _ _ Eq_ty) s0)
+  | ex s0 =>
+      congr_ex
+        (rinst_inst_ty (upRen_ty_ty xi_ty) (up_ty_ty sigma_ty)
+           (rinstInst_up_ty_ty _ _ Eq_ty) s0)
   end.
 
 Lemma rinstInst'_ty (xi_ty : nat -> nat) (s : ty) :
@@ -395,12 +433,14 @@ Inductive tm : Type :=
   | app : tm -> tm -> tm
   | tapp : tm -> ty -> tm
   | vt : vl -> tm
+  | unpack : tm -> tm -> tm
 with vl : Type :=
   | var_vl : nat -> vl
   | true : vl
   | false : vl
   | lam : ty -> tm -> vl
-  | tlam : tm -> vl.
+  | tlam : tm -> vl
+  | pack : ty -> vl -> vl.
 
 Lemma congr_app {s0 : tm} {s1 : tm} {t0 : tm} {t1 : tm} (H0 : s0 = t0)
   (H1 : s1 = t1) : app s0 s1 = app t0 t1.
@@ -419,6 +459,13 @@ Qed.
 Lemma congr_vt {s0 : vl} {t0 : vl} (H0 : s0 = t0) : vt s0 = vt t0.
 Proof.
 exact (eq_trans eq_refl (ap (fun x => vt x) H0)).
+Qed.
+
+Lemma congr_unpack {s0 : tm} {s1 : tm} {t0 : tm} {t1 : tm} (H0 : s0 = t0)
+  (H1 : s1 = t1) : unpack s0 s1 = unpack t0 t1.
+Proof.
+exact (eq_trans (eq_trans eq_refl (ap (fun x => unpack x s1) H0))
+         (ap (fun x => unpack t0 x) H1)).
 Qed.
 
 Lemma congr_true : true = true.
@@ -443,6 +490,13 @@ Proof.
 exact (eq_trans eq_refl (ap (fun x => tlam x) H0)).
 Qed.
 
+Lemma congr_pack {s0 : ty} {s1 : vl} {t0 : ty} {t1 : vl} (H0 : s0 = t0)
+  (H1 : s1 = t1) : pack s0 s1 = pack t0 t1.
+Proof.
+exact (eq_trans (eq_trans eq_refl (ap (fun x => pack x s1) H0))
+         (ap (fun x => pack t0 x) H1)).
+Qed.
+
 Lemma upRen_ty_vl (xi : nat -> nat) : nat -> nat.
 Proof.
 exact (xi).
@@ -464,6 +518,10 @@ Fixpoint ren_tm (xi_ty : nat -> nat) (xi_vl : nat -> nat) (s : tm) {struct s}
   | app s0 s1 => app (ren_tm xi_ty xi_vl s0) (ren_tm xi_ty xi_vl s1)
   | tapp s0 s1 => tapp (ren_tm xi_ty xi_vl s0) (ren_ty xi_ty s1)
   | vt s0 => vt (ren_vl xi_ty xi_vl s0)
+  | unpack s0 s1 =>
+      unpack (ren_tm xi_ty xi_vl s0)
+        (ren_tm (upRen_vl_ty (upRen_ty_ty xi_ty))
+           (upRen_vl_vl (upRen_ty_vl xi_vl)) s1)
   end
 with ren_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat) (s : vl) {struct s} :
 vl :=
@@ -475,6 +533,7 @@ vl :=
       lam (ren_ty xi_ty s0)
         (ren_tm (upRen_vl_ty xi_ty) (upRen_vl_vl xi_vl) s1)
   | tlam s0 => tlam (ren_tm (upRen_ty_ty xi_ty) (upRen_ty_vl xi_vl) s0)
+  | pack s0 s1 => pack (ren_ty xi_ty s0) (ren_vl xi_ty xi_vl s1)
   end.
 
 Lemma up_ty_vl (sigma : nat -> vl) : nat -> vl.
@@ -499,6 +558,10 @@ Fixpoint subst_tm (sigma_ty : nat -> ty) (sigma_vl : nat -> vl) (s : tm)
       app (subst_tm sigma_ty sigma_vl s0) (subst_tm sigma_ty sigma_vl s1)
   | tapp s0 s1 => tapp (subst_tm sigma_ty sigma_vl s0) (subst_ty sigma_ty s1)
   | vt s0 => vt (subst_vl sigma_ty sigma_vl s0)
+  | unpack s0 s1 =>
+      unpack (subst_tm sigma_ty sigma_vl s0)
+        (subst_tm (up_vl_ty (up_ty_ty sigma_ty))
+           (up_vl_vl (up_ty_vl sigma_vl)) s1)
   end
 with subst_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl) (s : vl) {struct
  s} : vl :=
@@ -510,6 +573,7 @@ with subst_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl) (s : vl) {struct
       lam (subst_ty sigma_ty s0)
         (subst_tm (up_vl_ty sigma_ty) (up_vl_vl sigma_vl) s1)
   | tlam s0 => tlam (subst_tm (up_ty_ty sigma_ty) (up_ty_vl sigma_vl) s0)
+  | pack s0 s1 => pack (subst_ty sigma_ty s0) (subst_vl sigma_ty sigma_vl s1)
   end.
 
 Lemma upId_ty_vl (sigma : nat -> vl) (Eq : forall x, sigma x = var_vl x) :
@@ -546,6 +610,11 @@ subst_tm sigma_ty sigma_vl s = s :=
       congr_tapp (idSubst_tm sigma_ty sigma_vl Eq_ty Eq_vl s0)
         (idSubst_ty sigma_ty Eq_ty s1)
   | vt s0 => congr_vt (idSubst_vl sigma_ty sigma_vl Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack (idSubst_tm sigma_ty sigma_vl Eq_ty Eq_vl s0)
+        (idSubst_tm (up_vl_ty (up_ty_ty sigma_ty))
+           (up_vl_vl (up_ty_vl sigma_vl)) (upId_vl_ty _ (upId_ty_ty _ Eq_ty))
+           (upId_vl_vl _ (upId_ty_vl _ Eq_vl)) s1)
   end
 with idSubst_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl)
 (Eq_ty : forall x, sigma_ty x = var_ty x)
@@ -563,6 +632,9 @@ subst_vl sigma_ty sigma_vl s = s :=
       congr_tlam
         (idSubst_tm (up_ty_ty sigma_ty) (up_ty_vl sigma_vl)
            (upId_ty_ty _ Eq_ty) (upId_ty_vl _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (idSubst_ty sigma_ty Eq_ty s0)
+        (idSubst_vl sigma_ty sigma_vl Eq_ty Eq_vl s1)
   end.
 
 Lemma upExtRen_ty_vl (xi : nat -> nat) (zeta : nat -> nat)
@@ -602,6 +674,14 @@ ren_tm xi_ty xi_vl s = ren_tm zeta_ty zeta_vl s :=
       congr_tapp (extRen_tm xi_ty xi_vl zeta_ty zeta_vl Eq_ty Eq_vl s0)
         (extRen_ty xi_ty zeta_ty Eq_ty s1)
   | vt s0 => congr_vt (extRen_vl xi_ty xi_vl zeta_ty zeta_vl Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack (extRen_tm xi_ty xi_vl zeta_ty zeta_vl Eq_ty Eq_vl s0)
+        (extRen_tm (upRen_vl_ty (upRen_ty_ty xi_ty))
+           (upRen_vl_vl (upRen_ty_vl xi_vl))
+           (upRen_vl_ty (upRen_ty_ty zeta_ty))
+           (upRen_vl_vl (upRen_ty_vl zeta_vl))
+           (upExtRen_vl_ty _ _ (upExtRen_ty_ty _ _ Eq_ty))
+           (upExtRen_vl_vl _ _ (upExtRen_ty_vl _ _ Eq_vl)) s1)
   end
 with extRen_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat)
 (zeta_ty : nat -> nat) (zeta_vl : nat -> nat)
@@ -622,6 +702,9 @@ ren_vl xi_ty xi_vl s = ren_vl zeta_ty zeta_vl s :=
         (extRen_tm (upRen_ty_ty xi_ty) (upRen_ty_vl xi_vl)
            (upRen_ty_ty zeta_ty) (upRen_ty_vl zeta_vl)
            (upExtRen_ty_ty _ _ Eq_ty) (upExtRen_ty_vl _ _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (extRen_ty xi_ty zeta_ty Eq_ty s0)
+        (extRen_vl xi_ty xi_vl zeta_ty zeta_vl Eq_ty Eq_vl s1)
   end.
 
 Lemma upExt_ty_vl (sigma : nat -> vl) (tau : nat -> vl)
@@ -662,6 +745,12 @@ subst_tm sigma_ty sigma_vl s = subst_tm tau_ty tau_vl s :=
       congr_tapp (ext_tm sigma_ty sigma_vl tau_ty tau_vl Eq_ty Eq_vl s0)
         (ext_ty sigma_ty tau_ty Eq_ty s1)
   | vt s0 => congr_vt (ext_vl sigma_ty sigma_vl tau_ty tau_vl Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack (ext_tm sigma_ty sigma_vl tau_ty tau_vl Eq_ty Eq_vl s0)
+        (ext_tm (up_vl_ty (up_ty_ty sigma_ty)) (up_vl_vl (up_ty_vl sigma_vl))
+           (up_vl_ty (up_ty_ty tau_ty)) (up_vl_vl (up_ty_vl tau_vl))
+           (upExt_vl_ty _ _ (upExt_ty_ty _ _ Eq_ty))
+           (upExt_vl_vl _ _ (upExt_ty_vl _ _ Eq_vl)) s1)
   end
 with ext_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl)
 (tau_ty : nat -> ty) (tau_vl : nat -> vl)
@@ -682,6 +771,9 @@ subst_vl sigma_ty sigma_vl s = subst_vl tau_ty tau_vl s :=
         (ext_tm (up_ty_ty sigma_ty) (up_ty_vl sigma_vl) (up_ty_ty tau_ty)
            (up_ty_vl tau_vl) (upExt_ty_ty _ _ Eq_ty) (upExt_ty_vl _ _ Eq_vl)
            s0)
+  | pack s0 s1 =>
+      congr_pack (ext_ty sigma_ty tau_ty Eq_ty s0)
+        (ext_vl sigma_ty sigma_vl tau_ty tau_vl Eq_ty Eq_vl s1)
   end.
 
 Lemma up_ren_ren_ty_vl (xi : nat -> nat) (zeta : nat -> nat)
@@ -725,6 +817,17 @@ ren_tm zeta_ty zeta_vl (ren_tm xi_ty xi_vl s) = ren_tm rho_ty rho_vl s :=
       congr_vt
         (compRenRen_vl xi_ty xi_vl zeta_ty zeta_vl rho_ty rho_vl Eq_ty Eq_vl
            s0)
+  | unpack s0 s1 =>
+      congr_unpack
+        (compRenRen_tm xi_ty xi_vl zeta_ty zeta_vl rho_ty rho_vl Eq_ty Eq_vl
+           s0)
+        (compRenRen_tm (upRen_vl_ty (upRen_ty_ty xi_ty))
+           (upRen_vl_vl (upRen_ty_vl xi_vl))
+           (upRen_vl_ty (upRen_ty_ty zeta_ty))
+           (upRen_vl_vl (upRen_ty_vl zeta_vl))
+           (upRen_vl_ty (upRen_ty_ty rho_ty))
+           (upRen_vl_vl (upRen_ty_vl rho_vl)) (up_ren_ren _ _ _ Eq_ty)
+           (up_ren_ren _ _ _ Eq_vl) s1)
   end
 with compRenRen_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat)
 (zeta_ty : nat -> nat) (zeta_vl : nat -> nat) (rho_ty : nat -> nat)
@@ -745,6 +848,10 @@ ren_vl zeta_ty zeta_vl (ren_vl xi_ty xi_vl s) = ren_vl rho_ty rho_vl s :=
         (compRenRen_tm (upRen_ty_ty xi_ty) (upRen_ty_vl xi_vl)
            (upRen_ty_ty zeta_ty) (upRen_ty_vl zeta_vl) (upRen_ty_ty rho_ty)
            (upRen_ty_vl rho_vl) (up_ren_ren _ _ _ Eq_ty) Eq_vl s0)
+  | pack s0 s1 =>
+      congr_pack (compRenRen_ty xi_ty zeta_ty rho_ty Eq_ty s0)
+        (compRenRen_vl xi_ty xi_vl zeta_ty zeta_vl rho_ty rho_vl Eq_ty Eq_vl
+           s1)
   end.
 
 Lemma up_ren_subst_ty_vl (xi : nat -> nat) (tau : nat -> vl)
@@ -794,6 +901,16 @@ subst_tm tau_ty tau_vl (ren_tm xi_ty xi_vl s) = subst_tm theta_ty theta_vl s
       congr_vt
         (compRenSubst_vl xi_ty xi_vl tau_ty tau_vl theta_ty theta_vl Eq_ty
            Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack
+        (compRenSubst_tm xi_ty xi_vl tau_ty tau_vl theta_ty theta_vl Eq_ty
+           Eq_vl s0)
+        (compRenSubst_tm (upRen_vl_ty (upRen_ty_ty xi_ty))
+           (upRen_vl_vl (upRen_ty_vl xi_vl)) (up_vl_ty (up_ty_ty tau_ty))
+           (up_vl_vl (up_ty_vl tau_vl)) (up_vl_ty (up_ty_ty theta_ty))
+           (up_vl_vl (up_ty_vl theta_vl))
+           (up_ren_subst_vl_ty _ _ _ (up_ren_subst_ty_ty _ _ _ Eq_ty))
+           (up_ren_subst_vl_vl _ _ _ (up_ren_subst_ty_vl _ _ _ Eq_vl)) s1)
   end
 with compRenSubst_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat)
 (tau_ty : nat -> ty) (tau_vl : nat -> vl) (theta_ty : nat -> ty)
@@ -818,6 +935,10 @@ subst_vl tau_ty tau_vl (ren_vl xi_ty xi_vl s) = subst_vl theta_ty theta_vl s
            (up_ty_ty tau_ty) (up_ty_vl tau_vl) (up_ty_ty theta_ty)
            (up_ty_vl theta_vl) (up_ren_subst_ty_ty _ _ _ Eq_ty)
            (up_ren_subst_ty_vl _ _ _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (compRenSubst_ty xi_ty tau_ty theta_ty Eq_ty s0)
+        (compRenSubst_vl xi_ty xi_vl tau_ty tau_vl theta_ty theta_vl Eq_ty
+           Eq_vl s1)
   end.
 
 Lemma up_subst_ren_ty_vl (sigma : nat -> vl) (zeta_ty : nat -> nat)
@@ -906,6 +1027,16 @@ subst_tm theta_ty theta_vl s :=
       congr_vt
         (compSubstRen_vl sigma_ty sigma_vl zeta_ty zeta_vl theta_ty theta_vl
            Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack
+        (compSubstRen_tm sigma_ty sigma_vl zeta_ty zeta_vl theta_ty theta_vl
+           Eq_ty Eq_vl s0)
+        (compSubstRen_tm (up_vl_ty (up_ty_ty sigma_ty))
+           (up_vl_vl (up_ty_vl sigma_vl)) (upRen_vl_ty (upRen_ty_ty zeta_ty))
+           (upRen_vl_vl (upRen_ty_vl zeta_vl)) (up_vl_ty (up_ty_ty theta_ty))
+           (up_vl_vl (up_ty_vl theta_vl))
+           (up_subst_ren_vl_ty _ _ _ (up_subst_ren_ty_ty _ _ _ Eq_ty))
+           (up_subst_ren_vl_vl _ _ _ _ (up_subst_ren_ty_vl _ _ _ _ Eq_vl)) s1)
   end
 with compSubstRen_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl)
 (zeta_ty : nat -> nat) (zeta_vl : nat -> nat) (theta_ty : nat -> ty)
@@ -931,6 +1062,10 @@ subst_vl theta_ty theta_vl s :=
            (upRen_ty_ty zeta_ty) (upRen_ty_vl zeta_vl) (up_ty_ty theta_ty)
            (up_ty_vl theta_vl) (up_subst_ren_ty_ty _ _ _ Eq_ty)
            (up_subst_ren_ty_vl _ _ _ _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (compSubstRen_ty sigma_ty zeta_ty theta_ty Eq_ty s0)
+        (compSubstRen_vl sigma_ty sigma_vl zeta_ty zeta_vl theta_ty theta_vl
+           Eq_ty Eq_vl s1)
   end.
 
 Lemma up_subst_subst_ty_vl (sigma : nat -> vl) (tau_ty : nat -> ty)
@@ -1020,6 +1155,17 @@ subst_tm theta_ty theta_vl s :=
       congr_vt
         (compSubstSubst_vl sigma_ty sigma_vl tau_ty tau_vl theta_ty theta_vl
            Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack
+        (compSubstSubst_tm sigma_ty sigma_vl tau_ty tau_vl theta_ty theta_vl
+           Eq_ty Eq_vl s0)
+        (compSubstSubst_tm (up_vl_ty (up_ty_ty sigma_ty))
+           (up_vl_vl (up_ty_vl sigma_vl)) (up_vl_ty (up_ty_ty tau_ty))
+           (up_vl_vl (up_ty_vl tau_vl)) (up_vl_ty (up_ty_ty theta_ty))
+           (up_vl_vl (up_ty_vl theta_vl))
+           (up_subst_subst_vl_ty _ _ _ (up_subst_subst_ty_ty _ _ _ Eq_ty))
+           (up_subst_subst_vl_vl _ _ _ _ (up_subst_subst_ty_vl _ _ _ _ Eq_vl))
+           s1)
   end
 with compSubstSubst_vl (sigma_ty : nat -> ty) (sigma_vl : nat -> vl)
 (tau_ty : nat -> ty) (tau_vl : nat -> vl) (theta_ty : nat -> ty)
@@ -1045,6 +1191,10 @@ subst_vl theta_ty theta_vl s :=
            (up_ty_ty tau_ty) (up_ty_vl tau_vl) (up_ty_ty theta_ty)
            (up_ty_vl theta_vl) (up_subst_subst_ty_ty _ _ _ Eq_ty)
            (up_subst_subst_ty_vl _ _ _ _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (compSubstSubst_ty sigma_ty tau_ty theta_ty Eq_ty s0)
+        (compSubstSubst_vl sigma_ty sigma_vl tau_ty tau_vl theta_ty theta_vl
+           Eq_ty Eq_vl s1)
   end.
 
 Lemma renRen_tm (xi_ty : nat -> nat) (xi_vl : nat -> nat)
@@ -1254,6 +1404,14 @@ Fixpoint rinst_inst_tm (xi_ty : nat -> nat) (xi_vl : nat -> nat)
         (rinst_inst_ty xi_ty sigma_ty Eq_ty s1)
   | vt s0 =>
       congr_vt (rinst_inst_vl xi_ty xi_vl sigma_ty sigma_vl Eq_ty Eq_vl s0)
+  | unpack s0 s1 =>
+      congr_unpack
+        (rinst_inst_tm xi_ty xi_vl sigma_ty sigma_vl Eq_ty Eq_vl s0)
+        (rinst_inst_tm (upRen_vl_ty (upRen_ty_ty xi_ty))
+           (upRen_vl_vl (upRen_ty_vl xi_vl)) (up_vl_ty (up_ty_ty sigma_ty))
+           (up_vl_vl (up_ty_vl sigma_vl))
+           (rinstInst_up_vl_ty _ _ (rinstInst_up_ty_ty _ _ Eq_ty))
+           (rinstInst_up_vl_vl _ _ (rinstInst_up_ty_vl _ _ Eq_vl)) s1)
   end
 with rinst_inst_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat)
 (sigma_ty : nat -> ty) (sigma_vl : nat -> vl)
@@ -1274,6 +1432,9 @@ with rinst_inst_vl (xi_ty : nat -> nat) (xi_vl : nat -> nat)
         (rinst_inst_tm (upRen_ty_ty xi_ty) (upRen_ty_vl xi_vl)
            (up_ty_ty sigma_ty) (up_ty_vl sigma_vl)
            (rinstInst_up_ty_ty _ _ Eq_ty) (rinstInst_up_ty_vl _ _ Eq_vl) s0)
+  | pack s0 s1 =>
+      congr_pack (rinst_inst_ty xi_ty sigma_ty Eq_ty s0)
+        (rinst_inst_vl xi_ty xi_vl sigma_ty sigma_vl Eq_ty Eq_vl s1)
   end.
 
 Lemma rinstInst'_tm (xi_ty : nat -> nat) (xi_vl : nat -> nat) (s : tm) :

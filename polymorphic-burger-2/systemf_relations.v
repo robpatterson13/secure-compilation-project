@@ -34,13 +34,19 @@ Definition vsubst (v : vl) :=
 Definition tsubst T:=
   scons T var_ty.
 
+Definition lift_ty t := ren_ty shift t.
+
+Definition lift_ctx Gamma := map lift_ty Gamma.
+
 Fixpoint well_formed_type (Delta : delta_context) (t : ty) : Prop :=
   match t with 
   | bool => True
   | (var_ty n) => n < (length Delta) 
   | (arr t1 t2) => well_formed_type Delta t1 /\ well_formed_type Delta t2
   | (all t) => well_formed_type (tt :: Delta) t
+  | (ex t) => well_formed_type (tt :: Delta) t
   end.
+
 
 Inductive has_type : delta_context -> gamma_context -> tm -> ty -> Prop :=
 | T_Var : forall Delta Gamma x t1,
@@ -54,7 +60,7 @@ Inductive has_type : delta_context -> gamma_context -> tm -> ty -> Prop :=
     has_type Delta (t1 :: Gamma) e t2 ->
     has_type Delta Gamma (vt (lam t1 e)) (arr t1 t2)
 | T_TLam : forall Delta Gamma t e,
-    has_type (tt :: Delta) Gamma e t ->
+    has_type (tt :: Delta) (lift_ctx Gamma) e t ->
     has_type Delta Gamma (vt (tlam e)) (all t)
 | T_App : forall Delta Gamma t1 t2 e1 e2,
     has_type Delta Gamma e1 (arr t1 t2) ->
@@ -63,7 +69,23 @@ Inductive has_type : delta_context -> gamma_context -> tm -> ty -> Prop :=
 | T_TApp : forall Delta Gamma t t' e,
     has_type Delta Gamma e (all t) ->
     well_formed_type Delta t' ->
-    has_type Delta Gamma (tapp e t') (subst_ty (tsubst t') t).
+    has_type Delta Gamma (tapp e t') (subst_ty (tsubst t') t)
+| T_Pack : forall Delta Gamma e t t',
+    has_type Delta Gamma (vt e) (subst_ty (tsubst t') t) ->
+    well_formed_type Delta t' ->
+    has_type Delta Gamma (vt (pack t' e)) (ex t)
+| T_Unpack : forall Delta Gamma t t2 e1 e2,
+    has_type Delta Gamma e1 (ex t) ->
+    has_type (tt :: Delta) (t :: (lift_ctx Gamma)) e2 t2 ->
+    well_formed_type Delta t2 ->
+    has_type Delta Gamma (unpack e1 e2) t2.
+
+Lemma test_lemma : (has_type [] [] 
+                            (vt (tlam (vt (lam (var_ty 0) (vt (tlam (vt (lam (var_ty 0) (vt (var_vl 1)))))))))) 
+                            (all (arr (var_ty 0) (all (arr (var_ty 0) (var_ty 1)))))).
+Proof.
+  repeat constructor.
+Qed.
 
 Inductive is_value : tm -> Prop :=
 | V_lam : forall T t,
@@ -84,7 +106,10 @@ Inductive big_eval : tm -> vl -> Prop :=
 | E_TApp : forall e T t v,
     big_eval e (tlam t) ->
     big_eval (subst_tm (tsubst T) var_vl t) v ->
-    big_eval (tapp e T) v.
+    big_eval (tapp e T) v
+| E_Unpack : forall t' v e v1,
+    big_eval (subst_tm (tsubst t') (vsubst v) e) v1 ->
+    big_eval (unpack (vt (pack t' v)) e) v1.
 
 
 Definition well_typed_pair (t1 t2 : ty) (p : vl * vl) : Prop :=
@@ -170,6 +195,13 @@ Fixpoint SN_V (T : ty) (v1 v2 : vl) (p : type_store) : Prop :=
                                  (SN_V t v1 v2 ((t1, t2, R) :: p)))))
         | _, _ => False
         end
+  | (ex t) => 
+      match v1, v2 with  
+      | (pack t1 v1'), (pack t2 v2') =>
+        (forall t1' t2', t1 = (subst_ty (p_1 p) t1') /\ t2 = (subst_ty (p_2 p) t2') ->
+          (exists R, (related t1 t2 R) /\ (SN_V t v1' v2' ((t1, t2, R) :: p))))
+      | _, _ => False
+      end
   end.
 
 Definition SN_E (T : ty) (e1 e2 : tm) (p : type_store) : Prop :=
