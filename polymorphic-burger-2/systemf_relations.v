@@ -198,7 +198,7 @@ Fixpoint SN_V (T : ty) (v1 v2 : vl) (p : type_store) : Prop :=
   | (ex t) => 
       match v1, v2 with  
       | (pack t1 v1'), (pack t2 v2') =>
-        (forall t1' t2', t1 = (subst_ty (p_1 p) t1') /\ t2 = (subst_ty (p_2 p) t2') ->
+        (exists t1' t2', t1 = (subst_ty (p_1 p) t1') /\ t2 = (subst_ty (p_2 p) t2') /\
           (exists R, (related t1 t2 R) /\ (SN_V t v1' v2' ((t1, t2, R) :: p))))
       | _, _ => False
       end
