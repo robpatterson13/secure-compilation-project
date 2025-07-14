@@ -38,6 +38,14 @@ Definition lift_ty t := ren_ty shift t.
 
 Definition lift_ctx Gamma := map lift_ty Gamma.
 
+Definition dshift (n : nat) : nat :=
+  match n with
+  | 0   => 0          
+  | S k => k          
+  end.
+
+Definition ty_dshift (t : ty) : ty := ren_ty dshift t.
+
 Fixpoint well_formed_type (Delta : delta_context) (t : ty) : Prop :=
   match t with 
   | bool => True
@@ -45,6 +53,15 @@ Fixpoint well_formed_type (Delta : delta_context) (t : ty) : Prop :=
   | (arr t1 t2) => well_formed_type Delta t1 /\ well_formed_type Delta t2
   | (all t) => well_formed_type (tt :: Delta) t
   | (ex t) => well_formed_type (tt :: Delta) t
+  end.
+
+Fixpoint well_formed_type_restrict (Delta : delta_context) (t : ty) (r : nat) : Prop :=
+  match t with 
+  | bool => True
+  | (var_ty n) => n < (length Delta) /\ (n <> r)
+  | (arr t1 t2) => well_formed_type_restrict Delta t1 r /\ well_formed_type_restrict Delta t2 r
+  | (all t) => well_formed_type_restrict (tt :: Delta) t (S r)
+  | (ex t) => well_formed_type_restrict (tt :: Delta) t (S r)
   end.
 
 
@@ -65,7 +82,7 @@ Inductive has_type : delta_context -> gamma_context -> tm -> ty -> Prop :=
 | T_App : forall Delta Gamma t1 t2 e1 e2,
     has_type Delta Gamma e1 (arr t1 t2) ->
     has_type Delta Gamma e2 t1 ->
-    has_type Delta Gamma (Core.app e1 e2) t2
+    has_type Delta Gamma (Core.app e1 e2) t2 
 | T_TApp : forall Delta Gamma t t' e,
     has_type Delta Gamma e (all t) ->
     well_formed_type Delta t' ->
@@ -77,14 +94,26 @@ Inductive has_type : delta_context -> gamma_context -> tm -> ty -> Prop :=
 | T_Unpack : forall Delta Gamma t t2 e1 e2,
     has_type Delta Gamma e1 (ex t) ->
     has_type (tt :: Delta) (t :: (lift_ctx Gamma)) e2 t2 ->
-    well_formed_type Delta t2 ->
-    has_type Delta Gamma (unpack e1 e2) t2.
+    well_formed_type_restrict Delta t2 0 ->
+    has_type Delta Gamma (unpack e1 e2) (ty_dshift t2).
 
-Lemma test_lemma : (has_type [] [] 
+Lemma test_lemma_1 : (has_type [] [] 
                             (vt (tlam (vt (lam (var_ty 0) (vt (tlam (vt (lam (var_ty 0) (vt (var_vl 1)))))))))) 
                             (all (arr (var_ty 0) (all (arr (var_ty 0) (var_ty 1)))))).
 Proof.
   repeat constructor.
+Qed.
+
+Lemma test_lemma_2 : (has_type [tt; tt; tt] []  (vt (pack bool true)) (ex (var_ty 0))).
+Proof.
+  repeat constructor.
+Qed.
+
+Lemma well_formed_lemma_test : (well_formed_type [tt; tt; tt] (var_ty 0)).
+Proof.
+  constructor.
+  constructor.
+  constructor.
 Qed.
 
 Inductive is_value : tm -> Prop :=
