@@ -261,6 +261,18 @@ Definition set_is_lr (p : type_store) (R : prelation) (t : ty) : Prop :=
   (In (v1, v2) R ->
   (SN_V t v1 v2 p)).
 
+Lemma sn_var :
+  forall Gamma vs p, SN_G Gamma vs p ->
+  forall x t, gamma_lookup Gamma x = Some t -> SN_V t (t_1 vs x) (t_2 vs x) p.
+Proof.
+  intros Gamma vs p HG. 
+  induction HG; intros x t Hlk; simpl in Hlk.
+  - destruct x. inversion Hlk. discriminate.
+  - destruct x; simpl in Hlk.
+    * inversion Hlk; subst. simpl. assumption.
+    * apply IHHG. assumption.
+Qed.
+
 Lemma compatability_lam :
   forall Delta Gamma e t t',
     related_lr Delta (t :: Gamma) e e t' ->
@@ -277,13 +289,13 @@ Proof.
   intros.
   unfold SN_E.
   specialize (T_Lam [] []) as HL2.
-  asimpl. 
-  specialize (HL2 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  specialize (HL2).
+  split. asimpl.
+  eapply HL2.
   destruct H1.
-  specialize (H4 p H2 vs).
-  unfold SN_E in H4.
-  asimpl in H4.
-
+  specialize (H4 p H2). 
+  specialize (HL2 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  
 Admitted.
   
 
@@ -407,9 +419,16 @@ Proof.
   unfold SN_E.
   split.
   asimpl.
-  admit.
+
+  assert (has_type [] [] (vt (t_1 vs n)) (subst_ty (p_1 p) t1)) as IHv. {
+    admit.
+  }
+  assumption.
   split.
-  admit.
+  assert (has_type [] [] (vt (t_2 vs n)) (subst_ty (p_2 p) t1)) as IHv2. {
+    admit.
+  }
+  assumption.
   exists (t_1 vs n). exists (t_2 vs n).
   split.
   asimpl.
@@ -417,14 +436,10 @@ Proof.
   split.
   asimpl.
   constructor.
-
-
-  
-
-  
-
-
-
+  specialize sn_var as Hvar.
+  specialize (Hvar Gamma vs p H1 n t1 H).
+  assumption.
+Admitted.
 
 Lemma compositionality : 
   forall Delta t' t p R,
