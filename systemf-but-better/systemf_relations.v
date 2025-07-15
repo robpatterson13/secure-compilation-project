@@ -317,7 +317,7 @@ Proof.
   asimpl in Hsl2.
   constructor.
   inversion Hsl2; subst. asimpl in H7.
-  assumption. asimpl.
+  assumption. asimpl. 
   exists (lam (subst_ty (p_1 p) t)
           (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
   exists (lam (subst_ty (p_2 p) t)
@@ -327,6 +327,13 @@ Proof.
   intros. split.
   specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
   inversion Hsl1; subst. asimpl in H8. simpl. asimpl. admit. split. admit. simpl in H1.
+  assert (SN_G (t :: Gamma) vs p) as Hsng. {
+    admit.
+  }
+  destruct H1.
+  specialize (H5 p H2 vs Hsng).
+  inversion H5; subst. destruct H7.
+
   specialize (subst_lemma1 Delta Gamma e t' vs p) as Hv1. asimpl. simpl. 
 
 
