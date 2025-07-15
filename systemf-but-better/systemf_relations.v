@@ -1,12 +1,6 @@
 (* The Grilled Onion Cheddar Burger is a cheeseburger with caramelized onions and cheddar cheese on it. 
    As of 2021, eating it will cause your lungs to rupture and eyes to bleed. *)
 
-(* Contrary to popular belief, the sponge cake is not actually made of sponges, and is instead
-   comprised of an unknown sort of biomatter that fell to earth during the seventh century. *)
-
-(* Of the original 150 million variants of cheddar that once existed, only 42 variants survived
-   the genetic bottleneck that plagued their kind for decades. *)
-
 Require Import core unscoped systemf.
 Require Import List. 
 Import ListNotations.
@@ -267,6 +261,150 @@ Definition set_is_lr (p : type_store) (R : prelation) (t : ty) : Prop :=
   (In (v1, v2) R ->
   (SN_V t v1 v2 p)).
 
+
+Lemma compatability_true :
+  forall Delta Gamma,
+    (related_lr Delta Gamma (vt true) (vt true) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      }
+      {
+       asimpl. split. constructor.
+       - exists true. exists true. split.
+         * constructor.   
+         * split. constructor. constructor. split. reflexivity. reflexivity.
+      }
+Qed.
+
+Lemma compatability_false :
+  forall Delta Gamma,
+    (related_lr Delta Gamma (vt false) (vt false) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      }
+      {
+       asimpl. split. constructor.
+       - exists false. exists false. split.
+         * constructor.   
+         * split. constructor. simpl. right. split. reflexivity. reflexivity.
+      }
+Qed.
+
+Lemma compatability_app :
+  forall Delta Gamma e1 e2 t1 t2,
+    related_lr Delta Gamma e1 e1 (arr t1 t2) ->
+    related_lr Delta Gamma e2 e2 t1 ->
+    related_lr Delta Gamma (Core.app e1 e2) (Core.app e1 e2) t2.
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst; inversion H0; subst.
+  specialize (T_App Delta Gamma t1 t2 e1 e2 H1 H3) as HT.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+  destruct H2. specialize (H7 p H5 vs H6). unfold SN_E in H7.
+  specialize (T_App [] [] (subst_ty (p_1 p) t1) (subst_ty (p_1 p) t2) (subst_tm (p_1 p) (t_1 vs) e1) (subst_tm (p_1 p) (t_1 vs) e2)) as HT2.
+  asimpl.
+  asimpl in H7. destruct H7.
+  specialize (HT2 H7).
+  destruct H4. specialize (H9 p H5 vs H6).
+  unfold SN_E in H9.
+  destruct H9.
+  specialize (HT2 H9).
+  split.
+  assumption.
+  specialize (T_App [] [] (subst_ty (p_2 p) t1) (subst_ty (p_2 p) t2) (subst_tm (p_2 p) (t_2 vs) e1) (subst_tm (p_2 p) (t_2 vs) e2)) as HT3.
+  destruct H10.
+  destruct H8.
+  specialize (HT3 H8 H10).
+  split.
+  assumption.
+  specialize (E_App) as HE.
+  destruct H11; destruct H11.
+  destruct H12; destruct H12.
+  destruct H12.
+  destruct H13.
+  specialize (HE (subst_tm (p_1 p) (t_1 vs) e1) (subst_tm (p_1 p) (t_1 vs) e2)).
+  simpl in H14.
+  induction x1; try contradiction.
+  induction x2; try contradiction.
+  destruct H14.
+  destruct H15.
+  destruct H11. destruct H17.
+  specialize (H16 x x0 H18).
+  destruct H16.
+  destruct H19.
+  destruct H20. destruct H20.
+  destruct H20.
+  destruct H21.
+  specialize (HE t t0 x1).
+  specialize (HE x H12 H11 H20).
+  exists x1.
+  specialize (E_App) as HE2.
+  specialize (HE2 (subst_tm (p_2 p) (t_2 vs) e1) (subst_tm (p_2 p) (t_2 vs) e2)).
+  specialize (HE2 t3 t4 x2 x0 H13 H17 H21).
+  exists x2.
+  split. assumption.
+  split. assumption.
+  assumption.
+Qed.
+
+
+
+
+  
+Lemma compatability_var :
+  forall Delta Gamma n t1,
+    (gamma_lookup Gamma n) = Some t1 ->
+    (related_lr Delta Gamma (vt (var_vl n)) (vt (var_vl n)) t1).
+Proof.
+  intros.
+  unfold related_lr.
+  split.
+  constructor. apply H.
+  split.
+  constructor. apply H.
+  intros.
+  unfold SN_E.
+  split.
+  asimpl.
+  admit.
+  split.
+  admit.
+  exists (t_1 vs n). exists (t_2 vs n).
+  split.
+  asimpl.
+  constructor.
+  split.
+  asimpl.
+  constructor.
+
+
+  
+
+  
+
+
+
+
 Lemma compositionality : 
   forall Delta t' t p R,
     well_formed_type Delta t' ->
@@ -279,6 +417,20 @@ Lemma compositionality :
     (SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p) ->
     SN_V (subst_ty (tsubst t') t) v1 v2 p)).
 Proof.
+  intros.
+  split.
+  - intros. induction t.
+    * admit.
+    * asimpl in H3. inversion H3; subst.
+      {
+       assumption. 
+      }
+      {
+       assumption.
+      }
+    * asimpl in H3. inversion H0; subst. 
+      specialize (IHt1 H4).
+      specialize (IHt2 H5). simpl in H3. simpl. 
 Admitted.
 
 Lemma compatability_types :
