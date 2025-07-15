@@ -270,6 +270,25 @@ Proof.
     * apply IHHG. assumption.
 Qed.
 
+
+Lemma subst_lemma1 :
+  forall Delta Gamma e t vs p,
+    SN_D Delta p ->
+    SN_G Gamma vs p ->
+    has_type Delta Gamma e t ->
+    has_type [] [] (subst_tm (p_1 p) (t_1 vs) e) (subst_ty (p_1 p) t).
+Proof.
+Admitted.
+
+Lemma subst_lemma2 :
+  forall Delta Gamma e t vs p,
+    SN_D Delta p ->
+    SN_G Gamma vs p ->
+    has_type Delta Gamma e t ->
+    has_type [] [] (subst_tm (p_2 p) (t_2 vs) e) (subst_ty (p_2 p) t).
+Proof.
+Admitted.
+
 Lemma compatability_lam :
   forall Delta Gamma e t t',
     related_lr Delta (t :: Gamma) e e t' ->
@@ -288,10 +307,29 @@ Proof.
   specialize (T_Lam [] []) as HL2.
   specialize (HL2).
   split. asimpl.
-  eapply HL2.
-  destruct H1.
-  specialize (H4 p H2). 
-  specialize (HL2 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
+  asimpl in Hsl1.
+  constructor.
+  inversion Hsl1; subst. asimpl in H7.
+  assumption.
+  split.
+  specialize (subst_lemma2 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
+  asimpl in Hsl2.
+  constructor.
+  inversion Hsl2; subst. asimpl in H7.
+  assumption. asimpl.
+  exists (lam (subst_ty (p_1 p) t)
+          (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  exists (lam (subst_ty (p_2 p) t)
+          (subst_tm (p_2 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e)).
+  split. constructor. split. constructor. constructor. reflexivity.
+  split. reflexivity.
+  intros. split.
+  specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
+  inversion Hsl1; subst. asimpl in H8. simpl. asimpl. admit. split. admit. simpl in H1.
+  specialize (subst_lemma1 Delta Gamma e t' vs p) as Hv1. asimpl. simpl. 
+
+
   
 Admitted.
   
@@ -417,26 +455,20 @@ Proof.
   split.
   asimpl.
   assert (has_type [] [] (vt (t_1 vs n)) (subst_ty (p_1 p) t1)) as IHv. { 
-    specialize (sn_var) as Hvar.
-    specialize (Hvar Gamma vs p H1 n t1 H).
-    induction t1. 
-    - admit.
-    - simpl. inversion Hvar; subst.
-      * destruct H2. rewrite H2. constructor.
-      * destruct H2. rewrite H2. constructor.
-    - simpl. 
-      induction (t_1 vs n); try contradiction. 
-      induction (t_2 vs n); try contradiction.
-      inversion Hvar; subst.
-      destruct H3. constructor.
-        
-
-    admit.
+    specialize (subst_lemma1 Delta Gamma (vt (var_vl n)) t1 vs p) as Hsl1.
+    asimpl in Hsl1.
+    specialize (T_Var Delta Gamma n t1 H) as Htv.
+    specialize (Hsl1 H0 H1 Htv).
+    assumption.
   }
   assumption.
   split.
   assert (has_type [] [] (vt (t_2 vs n)) (subst_ty (p_2 p) t1)) as IHv2. {
-    admit.
+    specialize (subst_lemma2 Delta Gamma (vt (var_vl n)) t1 vs p) as Hsl2.
+    asimpl in Hsl2.
+    specialize (T_Var Delta Gamma n t1 H) as Htv2.
+    specialize (Hsl2 H0 H1 Htv2).
+    assumption.
   }
   assumption.
   exists (t_1 vs n). exists (t_2 vs n).
@@ -449,7 +481,7 @@ Proof.
   specialize sn_var as Hvar.
   specialize (Hvar Gamma vs p H1 n t1 H).
   assumption.
-Admitted.
+Qed.
 
 Lemma compositionality : 
   forall Delta t' t p R,
