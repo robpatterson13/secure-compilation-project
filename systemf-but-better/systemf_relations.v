@@ -261,6 +261,31 @@ Definition set_is_lr (p : type_store) (R : prelation) (t : ty) : Prop :=
   (In (v1, v2) R ->
   (SN_V t v1 v2 p)).
 
+Lemma compatability_lam :
+  forall Delta Gamma e t t',
+    related_lr Delta (t :: Gamma) e e t' ->
+    related_lr Delta Gamma (vt (lam t e)) (vt (lam t e)) (arr t t').
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst.
+  specialize (T_Lam Delta Gamma t t' e H0) as HL.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+  specialize (T_Lam [] []) as HL2.
+  asimpl. 
+  specialize (HL2 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  destruct H1.
+  specialize (H4 p H2 vs).
+  unfold SN_E in H4.
+  asimpl in H4.
+
+Admitted.
+  
 
 Lemma compatability_true :
   forall Delta Gamma,
@@ -367,10 +392,6 @@ Proof.
   assumption.
 Qed.
 
-
-
-
-  
 Lemma compatability_var :
   forall Delta Gamma n t1,
     (gamma_lookup Gamma n) = Some t1 ->
