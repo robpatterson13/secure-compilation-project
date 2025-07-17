@@ -209,8 +209,8 @@ Fixpoint SN_V (T : ty) (v1 v2 : vl) (p : type_store) : Prop :=
         | (tlam b1), (tlam b2) =>
               (forall t1 t2 R,
                 (related t1 t2 R) ->
-                  ((has_type [] [] (subst_tm (tsubst t1) var_vl b1) (subst_ty (p_1 ((t1, t2, R) :: p)) t1)) /\
-                  (has_type [] [] (subst_tm (tsubst t2) var_vl b2) (subst_ty (p_2 ((t1, t2, R) :: p)) t2)) /\
+                  ((has_type [] [] (subst_tm (tsubst t1) var_vl b1) (subst_ty (p_1 ((t1, t2, R) :: p)) t)) /\
+                  (has_type [] [] (subst_tm (tsubst t2) var_vl b2) (subst_ty (p_2 ((t1, t2, R) :: p)) t)) /\
                   (exists v1 v2, big_eval (subst_tm (tsubst t1) var_vl b1) v1 /\ 
                                  big_eval (subst_tm (tsubst t2) var_vl b2) v2 /\ 
                                  (SN_V t v1 v2 ((t1, t2, R) :: p)))))
@@ -271,7 +271,7 @@ Proof.
     * apply IHHG. assumption.
 Qed.
 
-(* Substitutional Lemmas *)
+(* Substitutional Lemmas - Not fit for consumption *)
 
 Lemma subst_lemma1 :
   forall Delta Gamma e t vs p,
@@ -340,7 +340,7 @@ Proof.
     asimpl. 
     exists (tlam (subst_tm (scons (var_ty 0) (funcomp (ren_ty shift) (p_1 p))) (funcomp (ren_vl shift id) (t_1 vs)) e)).
     exists (tlam (subst_tm (scons (var_ty 0) (funcomp (ren_ty shift) (p_2 p))) (funcomp (ren_vl shift id) (t_2 vs)) e)).
-    split. constructor. split. constructor. constructor.
+    split. constructor. split. constructor. repeat split.
     * asimpl. simpl. 
       inversion Htl; subst. unfold funcomp. simpl. asimpl. 
       assert (Hsd : SN_D (tt :: Delta) ((t1, t2, R)::p)). {
@@ -357,8 +357,44 @@ Proof.
       destruct H2.
       destruct H6.
       inversion Htl; subst.
-        
+      assumption.
+    * asimpl. simpl. 
+      inversion Htl; subst. unfold funcomp. simpl. asimpl. 
+      assert (Hsd : SN_D (tt :: Delta) ((t1, t2, R)::p)). {
+        apply D_Cons.
+        - assumption.
+        - assumption.
+      }
+      specialize (H2 ((t1, t2, R)::p) Hsd vs).
+      assert (Hg1 : SN_G (lift_ctx Gamma) vs ((t1, t2, R) :: p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      simpl in H2.
+      destruct H2.
+      destruct H6.
+      inversion Htl; subst.
+      assumption.
+    * specialize (H2 ((t1, t2, R)::p)).
+      specialize (D_Cons Delta p t1 t2 R) as Hdc.
+      specialize (Hdc H3 H5).
+      specialize (H2 Hdc vs).
+      assert (Hg1 : SN_G (lift_ctx Gamma) vs ((t1, t2, R) :: p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      destruct H2.
+      destruct H6.
+      destruct H7. destruct H7.
+      exists x, x0.
+      destruct H7.
+      destruct H8.
+      repeat split.
+      asimpl. simpl. unfold funcomp. simpl. asimpl. simpl in H7. assumption.
+      asimpl. simpl. unfold funcomp. simpl. asimpl. simpl in H7. assumption.
+      assumption.
 Admitted.
+
 
 Lemma big_eval_ext e1 e2 v :
   e1 = e2 ->
