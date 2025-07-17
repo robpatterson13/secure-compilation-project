@@ -1,6 +1,7 @@
 Require Import core unscoped systemf.
 Require Import List. 
 Import ListNotations.
+Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 
 Definition gamma_context := list ty.
@@ -208,7 +209,7 @@ Fixpoint SN_V (T : ty) (v1 v2 : vl) (p : type_store) : Prop :=
         | (tlam b1), (tlam b2) =>
               (forall t1 t2 R,
                 (related t1 t2 R) ->
-                  ((has_type [] [] (subst_tm (tsubst t1) var_vl b1) (subst_ty (p_1 ((t1, t2, R) :: p)) t2)) /\
+                  ((has_type [] [] (subst_tm (tsubst t1) var_vl b1) (subst_ty (p_1 ((t1, t2, R) :: p)) t1)) /\
                   (has_type [] [] (subst_tm (tsubst t2) var_vl b2) (subst_ty (p_2 ((t1, t2, R) :: p)) t2)) /\
                   (exists v1 v2, big_eval (subst_tm (tsubst t1) var_vl b1) v1 /\ 
                                  big_eval (subst_tm (tsubst t2) var_vl b2) v2 /\ 
@@ -270,6 +271,7 @@ Proof.
     * apply IHHG. assumption.
 Qed.
 
+(* Substitutional Lemmas *)
 
 Lemma subst_lemma1 :
   forall Delta Gamma e t vs p,
@@ -288,6 +290,80 @@ Lemma subst_lemma2 :
     has_type [] [] (subst_tm (p_2 p) (t_2 vs) e) (subst_ty (p_2 p) t).
 Proof.
 Admitted.
+
+Lemma subst_var0 :
+  forall T T' e v,
+    has_type [] [T] e T' ->
+    has_type [] [] (vt v) T ->
+    has_type [] [] (subst_tm var_ty (vsubst v) e) T'.
+Proof.
+Admitted.
+
+Lemma compositionality : 
+  forall Delta t' t p R,
+    well_formed_type Delta t' ->
+    well_formed_type (tt :: Delta) t ->
+    (SN_D Delta p) ->
+    set_is_lr p R t' -> (forall v1 v2,
+    (SN_V (subst_ty (tsubst t') t) v1 v2 p ->
+    SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p)) 
+    /\
+    (SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p) ->
+    SN_V (subst_ty (tsubst t') t) v1 v2 p)).
+Proof.
+Admitted.
+
+
+
+Lemma compatability_tlam :
+  forall Delta Gamma e t,
+    related_lr (tt::Delta) (lift_ctx Gamma) e e t ->
+    related_lr Delta Gamma (vt (tlam e)) (vt (tlam e)) (all t).
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst. destruct H1.
+  specialize (T_TLam Delta Gamma t e H0) as Htl.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+
+  repeat split.
+  - specialize (subst_lemma1 Delta Gamma (vt (tlam e)) (all t) vs p H3 H4 Htl) as Hsl1.
+    assumption.
+  - specialize (subst_lemma2 Delta Gamma (vt (tlam e)) (all t) vs p H3 H4 Htl) as Hsl2.
+    assumption.
+  - unfold SN_E in H2.
+    asimpl. 
+    exists (tlam (subst_tm (scons (var_ty 0) (funcomp (ren_ty shift) (p_1 p))) (funcomp (ren_vl shift id) (t_1 vs)) e)).
+    exists (tlam (subst_tm (scons (var_ty 0) (funcomp (ren_ty shift) (p_2 p))) (funcomp (ren_vl shift id) (t_2 vs)) e)).
+    split. constructor. split. constructor. constructor.
+    * asimpl. simpl. 
+      inversion Htl; subst. unfold funcomp. simpl. asimpl. 
+      assert (Hsd : SN_D (tt :: Delta) ((t1, t2, R)::p)). {
+        apply D_Cons.
+        - assumption.
+        - assumption.
+      }
+      specialize (H2 ((t1, t2, R)::p) Hsd vs).
+      assert (Hg1 : SN_G (lift_ctx Gamma) vs ((t1, t2, R) :: p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      simpl in H2.
+      destruct H2.
+      destruct H6.
+      inversion Htl; subst.
+        
+Admitted.
+
+Lemma big_eval_ext e1 e2 v :
+  e1 = e2 ->
+  big_eval e1 v = big_eval e2 v.
+Proof. intros ->; reflexivity. Qed.
 
 Lemma compatability_lam :
   forall Delta Gamma e t t',
@@ -326,62 +402,167 @@ Proof.
   split. reflexivity.
   intros. split.
   specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
-  inversion Hsl1; subst. asimpl in H8. simpl. asimpl. admit. split. admit. simpl in H1.
-  assert (SN_G (t :: Gamma) vs p) as Hsng. {
-    admit.
+  inversion Hsl1; subst. asimpl in H8. simpl. asimpl.
+  specialize (subst_var0 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p)
+          (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e) v1' H8) as Hsv1.
+  asimpl in Hsv1.
+  simpl in Hsv1. apply Hsv1. 
+  pose (vs1 := (v1', v2') :: nil).
+  assert (SN_G (t :: nil) vs1 p) as Hsg. {
+    apply G_Cons.
+    - apply G_Empty.
+    - exact H4.                      
   }
-  destruct H1.
-  specialize (H5 p H2 vs Hsng).
-  inversion H5; subst. destruct H7.
-
-  specialize (subst_lemma1 Delta Gamma e t' vs p) as Hv1. asimpl. simpl. 
-
-
-  
-Admitted.
-  
-
-Lemma compatability_true :
-  forall Delta Gamma,
-    (related_lr Delta Gamma (vt true) (vt true) bool).
+  assert (has_type Delta [t] (vt (var_vl 0)) t) as Hvar0. {
+    apply T_Var.
+    simpl. reflexivity. 
+  }
+  specialize (subst_lemma1 Delta (t :: nil)  (vt (var_vl 0)) t vs1 p H2 Hsg Hvar0) as winner.
+  simpl in winner. assumption.
+  split.
+  specialize (subst_lemma2 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
+  inversion Hsl2; subst. asimpl in H8. simpl. asimpl.
+  specialize (subst_var0 (subst_ty (p_2 p) t) (subst_ty (p_2 p) t') (subst_tm (p_2 p)
+          (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e) v2' H8) as Hsv2.
+  asimpl in Hsv2.
+  simpl in Hsv2. apply Hsv2.
+  pose (vs1 := (v1', v2') :: nil).
+  assert (SN_G (t :: nil) vs1 p) as Hsg. {
+    apply G_Cons.
+    - apply G_Empty.
+    - exact H4.                      
+  }
+  assert (has_type Delta [t] (vt (var_vl 0)) t) as Hvar0. {
+    apply T_Var.
+    simpl. reflexivity. 
+  }
+  specialize (subst_lemma2 Delta (t :: nil)  (vt (var_vl 0)) t vs1 p H2 Hsg Hvar0) as winner2.
+  simpl in winner2. assumption.
+  destruct H1. specialize (H5 p H2 ((v1', v2')::vs)).
+  specialize G_Cons as Hcons1.
+  specialize (Hcons1 Gamma t vs v1' v2' p H3 H4).
+  specialize (H5 Hcons1). unfold SN_E in H5.
+  destruct H5.
+  destruct H6.
+  simpl in H7.
+  destruct H7 as [v1].
+  destruct H7 as [v2].
+  destruct H7 as [BE1 BE2].
+  exists v1, v2.
+  assert (big_eval (subst_tm (p_1 p) (scons v1' (t_1 vs)) e) v1 = big_eval
+  (subst_tm var_ty (vsubst v1')
+     (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)) v1) as Heq. {
+    asimpl. simpl.
+      assert (He_env : forall n,
+            (scons v1' (t_1 vs) : nat -> vl) n =
+            (scons v1'
+               (funcomp (subst_vl var_ty (funcomp (vsubst v1') shift))
+                        (t_1 vs))) n).
+    {
+      intro n; destruct n; simpl; auto.
+      unfold funcomp. simpl. asimpl. reflexivity.
+    }
+    apply big_eval_ext.
+    specialize (ext_tm (p_1 p) (scons v1' (t_1 vs)) (p_1 p) (scons v1'
+     (funcomp (subst_vl var_ty (funcomp (vsubst v1') shift))
+              (t_1 vs))) (fun _ => eq_refl) He_env e) as Hi. 
+    assumption.
+  }
+  assert (big_eval (subst_tm (p_2 p) (scons v2' (t_2 vs)) e) v2 = big_eval
+  (subst_tm var_ty (vsubst v2')
+     (subst_tm (p_2 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e)) v2) as Heq2. {
+    asimpl. simpl. 
+    assert (He_env : forall n,
+            (scons v2' (t_2 vs) : nat -> vl) n =
+            (scons v2'
+               (funcomp (subst_vl var_ty (funcomp (vsubst v2') shift))
+                        (t_2 vs))) n).
+    {
+      intro n; destruct n; simpl; auto.
+      unfold funcomp. simpl. asimpl. reflexivity.
+    }
+    apply big_eval_ext.
+    specialize (ext_tm (p_2 p) (scons v2' (t_2 vs)) (p_2 p) (scons v2'
+     (funcomp (subst_vl var_ty (funcomp (vsubst v2') shift))
+              (t_2 vs))) (fun _ => eq_refl) He_env e) as Hi. 
+    assumption.
+  }
+  repeat split.
+  - asimpl. asimpl in Heq. rewrite <- Heq. assumption.
+  - asimpl. asimpl in Heq2. rewrite <- Heq2. destruct BE2. assumption.
+  - destruct BE2. apply H8.
+Qed.
+    
+Lemma compatability_tapp :
+  forall Delta Gamma e t t',
+    related_lr Delta Gamma e e (all t) ->
+    well_formed_type Delta t' ->
+    related_lr Delta Gamma (tapp e t') (tapp e t') (subst_ty (tsubst t') t).
 Proof.
   intros.
-  constructor.
-  - constructor.
-  - split.
-    * constructor.
-    * intros. constructor.
-      {
-       asimpl. constructor. 
-      }
-      {
-       asimpl. split. constructor.
-       - exists true. exists true. split.
-         * constructor.   
-         * split. constructor. constructor. split. reflexivity. reflexivity.
-      }
-Qed.
-
-Lemma compatability_false :
-  forall Delta Gamma,
-    (related_lr Delta Gamma (vt false) (vt false) bool).
-Proof.
-  intros.
-  constructor.
-  - constructor.
-  - split.
-    * constructor.
-    * intros. constructor.
-      {
-       asimpl. constructor. 
-      }
-      {
-       asimpl. split. constructor.
-       - exists false. exists false. split.
-         * constructor.   
-         * split. constructor. simpl. right. split. reflexivity. reflexivity.
-      }
-Qed.
+  unfold related_lr.
+  repeat split; inversion H; subst.
+  - specialize (T_TApp) as Hta.
+    specialize (Hta Delta Gamma t t' e H1 H0).
+    assumption.
+  - specialize (T_TApp) as Hta.
+    specialize (Hta Delta Gamma t t' e H1 H0).
+    assumption.
+  - specialize (subst_lemma1 Delta Gamma (tapp e t') (subst_ty (tsubst t') t) vs p) as Hs1.
+    specialize (Hs1 H1 H2).
+    specialize (T_TApp Delta Gamma t t' e) as Htapp.
+    specialize (Htapp H3 H0).
+    specialize (Hs1 Htapp).
+    assumption.
+  - specialize (subst_lemma2 Delta Gamma (tapp e t') (subst_ty (tsubst t') t) vs p) as Hs2.
+    specialize (Hs2 H1 H2).
+    specialize (T_TApp Delta Gamma t t' e) as Htapp.
+    specialize (Htapp H3 H0).
+    specialize (Hs2 Htapp).
+    assumption.
+  - unfold SN_E in H4.
+    destruct H4.
+    specialize (H5 p H1 vs H2).
+    destruct H5.
+    destruct H6.
+    specialize (E_TApp) as HEtapp.
+    asimpl.
+    destruct H7.
+    destruct H7.
+    destruct H7.
+    destruct H8.
+    destruct x; try contradiction.
+    destruct x0; try contradiction.
+    simpl in H9.
+    specialize (H9 (subst_ty (p_1 p) t') (subst_ty (p_2 p) t') []) as H91.
+    assert (related (subst_ty (p_1 p) t') (subst_ty (p_2 p) t') []) as Hrel. {
+      constructor.
+    }
+    specialize (H91 Hrel).
+    destruct H91.
+    destruct H11.
+    destruct H12. destruct H12. destruct H12. destruct H13.
+    specialize (HEtapp (subst_tm (p_1 p) (t_1 vs) e) (subst_ty (p_1 p) t') t0 x H7 H12).
+    specialize (E_TApp) as HEtapp2.
+    specialize (H9 (subst_ty (p_1 p) t') (subst_ty (p_2 p) t') []) as H92.
+    assert (related (subst_ty (p_1 p) t') (subst_ty (p_2 p) t') []) as Hrel2. {
+      constructor.
+    }
+    specialize (H92 Hrel2).
+    destruct H92.
+    destruct H16.
+    destruct H17. destruct H17.
+    destruct H17.
+    destruct H18.
+    specialize (HEtapp2 (subst_tm (p_2 p) (t_2 vs) e) (subst_ty (p_2 p) t') t1 x2 H8 H18).
+    exists x. exists x2.
+    split.
+    assumption.
+    split.
+    assumption.
+    specialize (compositionality _ t' t p [] H0 ) as Hc.
+    unfold related_lr in H.
+  Admitted.
 
 Lemma compatability_app :
   forall Delta Gamma e1 e2 t1 t2,
@@ -445,6 +626,48 @@ Proof.
   split. assumption.
   assumption.
 Qed.
+  
+Lemma compatability_true :
+  forall Delta Gamma,
+    (related_lr Delta Gamma (vt true) (vt true) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      }
+      {
+       asimpl. split. constructor.
+       - exists true. exists true. split.
+         * constructor.   
+         * split. constructor. constructor. split. reflexivity. reflexivity.
+      }
+Qed.
+
+Lemma compatability_false :
+  forall Delta Gamma,
+    (related_lr Delta Gamma (vt false) (vt false) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      }
+      {
+       asimpl. split. constructor.
+       - exists false. exists false. split.
+         * constructor.   
+         * split. constructor. simpl. right. split. reflexivity. reflexivity.
+      }
+Qed.
 
 Lemma compatability_var :
   forall Delta Gamma n t1,
@@ -490,47 +713,29 @@ Proof.
   assumption.
 Qed.
 
-Lemma compositionality : 
-  forall Delta t' t p R,
-    well_formed_type Delta t' ->
-    well_formed_type (tt :: Delta) t ->
-    (SN_D Delta p) ->
-    set_is_lr p R t' -> (forall v1 v2,
-    (SN_V (subst_ty (tsubst t') t) v1 v2 p ->
-    SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p)) 
-    /\
-    (SN_V t v1 v2 (((subst_ty (p_1 p) t') , (subst_ty (p_2 p) t'), R) :: p) ->
-    SN_V (subst_ty (tsubst t') t) v1 v2 p)).
-Proof.
-  intros.
-  split.
-  - intros. induction t.
-    * admit.
-    * asimpl in H3. inversion H3; subst.
-      {
-       assumption. 
-      }
-      {
-       assumption.
-      }
-    * asimpl in H3. inversion H0; subst. 
-      specialize (IHt1 H4).
-      specialize (IHt2 H5). simpl in H3. simpl. 
-Admitted.
-
-Lemma compatability_types :
-  forall Delta Gamma e1 e2 t t',
-  related_lr Delta Gamma e1 e2 (all t) ->
-  well_formed_type Delta t' ->
-  related_lr Delta Gamma (tapp e1 t') (tapp e2 t') (subst_ty (tsubst t') t).
-Proof.
-Admitted.
-
 Lemma fundamental : 
   forall Delta Gamma e t,
   (has_type Delta Gamma e t) ->
   (related_lr Delta Gamma e e t).
 Proof.
+  intros.
+  induction H.
+  - specialize (compatability_var Delta Gamma x t1 H) as Hv.
+    assumption.
+  - specialize (compatability_true Delta Gamma) as Ht.
+    assumption.
+  - specialize (compatability_false Delta Gamma) as Hf.
+    assumption.
+  - specialize (compatability_lam Delta Gamma e t1 t2 IHhas_type) as Hl.
+    assumption.
+  - specialize (compatability_tlam Delta Gamma e t IHhas_type) as Htl.
+    assumption.
+  - specialize (compatability_app Delta Gamma e1 e2 t1 t2 IHhas_type1 IHhas_type2) as Ha.
+    assumption.
+  - specialize (compatability_tapp Delta Gamma e t t' IHhas_type H0) as Hta.
+    assumption.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma free_theorem_i :
