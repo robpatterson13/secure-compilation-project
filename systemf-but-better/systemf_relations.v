@@ -297,6 +297,7 @@ Lemma subst_var0 :
     has_type [] [] (vt v) T ->
     has_type [] [] (subst_tm var_ty (vsubst v) e) T'.
 Proof.
+  intros.
 Admitted.
 
 Lemma compositionality : 
@@ -313,7 +314,46 @@ Lemma compositionality :
 Proof.
 Admitted.
 
-
+Lemma compatability_pack :
+  forall Delta Gamma e t t',
+    related_lr Delta Gamma (vt e) (vt e) (subst_ty (tsubst t') t) ->
+    well_formed_type Delta t' ->
+    related_lr Delta Gamma (vt (pack t' e)) (vt (pack t' e)) (ex t).
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst.
+  specialize (T_Pack) as Hp.
+  specialize (Hp Delta Gamma e t t' H1 H0).
+  repeat split.
+  assumption.
+  assumption.
+  specialize (subst_lemma1 Delta Gamma (vt (pack t' e)) (ex t) vs p H3 H4 Hp) as Hs1.
+  assumption.
+  specialize (subst_lemma2 Delta Gamma (vt (pack t' e)) (ex t) vs p H3 H4 Hp) as Hs2.
+  assumption.
+  destruct H2.
+  specialize (H5 p H3 vs H4).
+  unfold SN_E in H5.
+  destruct H5.
+  destruct H6.
+  destruct H7. destruct H7.
+  destruct H7.
+  destruct H8.
+  asimpl.
+  exists (pack (subst_ty (p_1 p) t') (subst_vl (p_1 p) (t_1 vs) e)).
+  exists (pack (subst_ty (p_2 p) t') (subst_vl (p_2 p) (t_2 vs) e)).
+  repeat split.
+  constructor.
+  constructor.
+  simpl.
+  exists t', t'.
+  repeat split.
+  exists [].
+  repeat split.
+  constructor.
+  
+Admitted.
 
 Lemma compatability_tlam :
   forall Delta Gamma e t,
@@ -425,20 +465,16 @@ Proof.
   split. asimpl.
   specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
   asimpl in Hsl1.
-  constructor.
-  inversion Hsl1; subst. asimpl in H7.
   assumption.
   split.
   specialize (subst_lemma2 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
   asimpl in Hsl2.
-  constructor.
-  inversion Hsl2; subst. asimpl in H7.
   assumption. asimpl. 
   exists (lam (subst_ty (p_1 p) t)
           (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)).
   exists (lam (subst_ty (p_2 p) t)
           (subst_tm (p_2 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e)).
-  split. constructor. split. constructor. constructor. reflexivity.
+  split. constructor. split. constructor. split. reflexivity.
   split. reflexivity.
   intros. split.
   specialize (subst_lemma1 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
@@ -462,9 +498,11 @@ Proof.
   split.
   specialize (subst_lemma2 Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
   inversion Hsl2; subst. asimpl in H8. simpl. asimpl.
+  unfold funcomp. simpl. asimpl. simpl. 
+
   specialize (subst_var0 (subst_ty (p_2 p) t) (subst_ty (p_2 p) t') (subst_tm (p_2 p)
           (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e) v2' H8) as Hsv2.
-  asimpl in Hsv2.
+  asimpl in Hsv2. unfold funcomp in Hsv2. simpl in Hsv2. asimpl in Hsv2.
   simpl in Hsv2. apply Hsv2.
   pose (vs1 := (v1', v2') :: nil).
   assert (SN_G (t :: nil) vs1 p) as Hsg. {
@@ -492,40 +530,13 @@ Proof.
   assert (big_eval (subst_tm (p_1 p) (scons v1' (t_1 vs)) e) v1 = big_eval
   (subst_tm var_ty (vsubst v1')
      (subst_tm (p_1 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_1 vs))) e)) v1) as Heq. {
-    asimpl. simpl.
-      assert (He_env : forall n,
-            (scons v1' (t_1 vs) : nat -> vl) n =
-            (scons v1'
-               (funcomp (subst_vl var_ty (funcomp (vsubst v1') shift))
-                        (t_1 vs))) n).
-    {
-      intro n; destruct n; simpl; auto.
-      unfold funcomp. simpl. asimpl. reflexivity.
-    }
-    apply big_eval_ext.
-    specialize (ext_tm (p_1 p) (scons v1' (t_1 vs)) (p_1 p) (scons v1'
-     (funcomp (subst_vl var_ty (funcomp (vsubst v1') shift))
-              (t_1 vs))) (fun _ => eq_refl) He_env e) as Hi. 
-    assumption.
+    asimpl. simpl. unfold funcomp. simpl. asimpl.
+    reflexivity.
   }
   assert (big_eval (subst_tm (p_2 p) (scons v2' (t_2 vs)) e) v2 = big_eval
   (subst_tm var_ty (vsubst v2')
      (subst_tm (p_2 p) (scons (var_vl 0) (funcomp (ren_vl id shift) (t_2 vs))) e)) v2) as Heq2. {
-    asimpl. simpl. 
-    assert (He_env : forall n,
-            (scons v2' (t_2 vs) : nat -> vl) n =
-            (scons v2'
-               (funcomp (subst_vl var_ty (funcomp (vsubst v2') shift))
-                        (t_2 vs))) n).
-    {
-      intro n; destruct n; simpl; auto.
-      unfold funcomp. simpl. asimpl. reflexivity.
-    }
-    apply big_eval_ext.
-    specialize (ext_tm (p_2 p) (scons v2' (t_2 vs)) (p_2 p) (scons v2'
-     (funcomp (subst_vl var_ty (funcomp (vsubst v2') shift))
-              (t_2 vs))) (fun _ => eq_refl) He_env e) as Hi. 
-    assumption.
+    asimpl. simpl. unfold funcomp. simpl. asimpl. reflexivity.
   }
   repeat split.
   - asimpl. asimpl in Heq. rewrite <- Heq. assumption.
@@ -752,6 +763,8 @@ Proof.
   specialize (Hvar Gamma vs p H1 n t1 H).
   assumption.
 Qed.
+
+(* Prepare the Dreaded Pack/Unpack rules *)
 
 Lemma fundamental : 
   forall Delta Gamma e t,
