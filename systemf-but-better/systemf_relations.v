@@ -350,6 +350,10 @@ Proof.
       }
       specialize (H2 ((t1, t2, R)::p) Hsd vs).
       assert (Hg1 : SN_G (lift_ctx Gamma) vs ((t1, t2, R) :: p)). {
+          induction H4.
+          - simpl. specialize (G_Empty ((t1, t2, R) :: p)) as He. assumption.
+          - assert (Hcg : SN_G (T::Gamma') ((v1,v2)::o) p).
+            { apply G_Cons. apply H4. apply H6. }
           admit.
       }
       specialize (H2 Hg1).
