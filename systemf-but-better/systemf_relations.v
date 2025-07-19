@@ -193,11 +193,7 @@ Fixpoint SN_V (T : ty) (v1 v2 : vl) (p : type_store) : Prop :=
         t1' = (subst_ty (p_1 p) t1) /\
         t2' = (subst_ty (p_2 p) t1) /\
         (forall v1' v2', (SN_V t1 v1' v2' p) ->
-        ((has_type [] [] (subst_tm var_ty (vsubst v1') b1) (subst_ty (p_1 p) t2)) /\
-         (has_type [] [] (subst_tm var_ty (vsubst v2') b2) (subst_ty (p_2 p) t2)) /\
-         (exists v1 v2, big_eval (subst_tm var_ty (vsubst v1') b1) v1 /\
-                        big_eval (subst_tm var_ty (vsubst v2') b2) v2 /\ 
-                        (SN_V t2 v1 v2 p))))
+        z`
       | _, _ => False
       end
   | (var_ty n) => match ts_lookup p n with

@@ -7,11 +7,15 @@ Require Import Setoid Morphisms Relation_Definitions.
 (* delta is typically the number of type variables, while m is typically the number of value variables *)
 
 Definition delta_context : Type := nat.
+
 Definition gamma_context (delta : delta_context) (m : nat) := fin m -> ty delta.
+
 Definition prelation (delta : delta_context) ( m : nat ) : Type := list (vl delta m * vl delta m).
-Definition type_store (delta : delta_context) (m : nat ) : Type := 
-  (fin m) -> (ty delta * ty delta * prelation delta m).
-Definition value_store  (delta : delta_context) (m : nat) : Type := (fin m) -> vl delta m * vl delta m.
+
+Definition type_store (delta : delta_context) : Type := 
+  (fin delta) -> (ty 0 * ty 0 * prelation 0 0).
+
+Definition value_store (m : nat) : Type := (fin m) -> vl 0 0 * vl 0 0.
 
 Definition vsubst {delta : delta_context} {m : nat} (v : vl delta m ) :=
   scons v var_vl. 
@@ -85,26 +89,26 @@ Inductive big_eval {delta m : nat} : tm delta m -> vl delta m -> Prop :=
     big_eval (subst_tm (tsubst t') (vsubst v) e) v1 ->
     big_eval (unpack (vt (pack t' v)) e) v1.
 
-Definition p_1 {delta m}
-  (ts : type_store delta m) : fin m -> ty delta :=
+Definition p_1 {delta}
+  (ts : type_store delta) : fin delta -> ty 0 :=
   fun i =>
     let '(T1, _T2, _R) := ts i in
     T1.
 
-Definition p_2 {delta m}
-  (ts : type_store delta m) : fin m -> ty delta :=
+Definition p_2 {delta}
+  (ts : type_store delta) : fin delta -> ty 0 :=
   fun i =>
     let '(_T1, T2, _R) := ts i in
     T2.
 
-Definition t_1 {delta m}
-  (vs : value_store delta m) : fin m -> vl delta m :=
+Definition t_1 {m}
+  (vs : value_store m) : fin m -> vl 0 0 :=
     fun i =>
       let '(v1, _v2) := vs i in
       v1.
 
-Definition t_2 {delta m}
-  (vs : value_store delta m) : fin m -> vl delta m :=
+Definition t_2 {m}
+  (vs : value_store m) : fin m -> vl 0 0 :=
     fun i =>
       let '(_v1, v2) := vs i in
       v2.
@@ -117,7 +121,50 @@ Definition well_typed_pair (t1 t2 : ty 0) (p : vl 0 0 * vl 0 0) : Prop :=
 Definition related (t1 t2 : ty 0) (R : prelation 0 0) : Prop :=
   Forall (well_typed_pair t1 t2) R. 
 
-Definition SN_E {m} (T : ty m) (e1 e2 : tm 0 0) (p : type_store 0 m) : Prop :=
+Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : Prop :=
+  match T with
+  | (Core.bool)  => (v1 = true /\ v2 = true) \/ (v1 = false /\ v2 = false)
+  | (arr t1 t2) =>
+      match v1, v2 with
+      | (lam t1' b1), (lam t2' b2) => 
+        t1' = (subst_ty (p_1 p) t1) /\
+        t2' = (subst_ty (p_2 p) t1) /\
+        (forall v1' v2', (SN_V t1 v1' v2' p) ->
+        ((has_type 0 (empty_gamma 0) (subst_tm var_ty (vsubst v1') b1) (subst_ty (p_1 p) t2)) /\
+         (has_type 0 (empty_gamma 0) (subst_tm var_ty (vsubst v2') b2) (subst_ty (p_2 p) t2)) /\
+         (exists v1 v2, big_eval (subst_tm var_ty (vsubst v1') b1) v1 /\
+                        big_eval (subst_tm var_ty (vsubst v2') b2) v2 /\ 
+                        (SN_V t2 v1 v2 p))))
+      | _, _ => False
+      end
+  | (var_ty n) => 
+      let '(T1,T2,R) := p n in
+      In (v1,v2) R
+  | (all t) => 
+        match v1, v2 with
+        | (tlam b1), (tlam b2) =>
+              (forall t1 t2 R,
+                (related t1 t2 R) ->
+                  ((has_type 0 (empty_gamma 0) (subst_tm (tsubst t1) var_vl b1) (subst_ty (p_1 (scons (t1, t2, R) p)) t)) /\
+                  (has_type 0 (empty_gamma 0) (subst_tm (tsubst t2) var_vl b2) (subst_ty (p_2 (scons (t1, t2, R) p)) t)) /\
+                  (exists v1 v2, big_eval (subst_tm (tsubst t1) var_vl b1) v1 /\ 
+                                 big_eval (subst_tm (tsubst t2) var_vl b2) v2 /\ 
+                                 (SN_V t v1 v2 (scons (t1, t2, R) p)))))
+        | _, _ => False
+        end
+  | (ex t) => 
+      match v1, v2 with  
+      | (pack t1 v1'), (pack t2 v2') =>
+        (exists t1' t2', t1 = (subst_ty (p_1 p) t1') /\ t2 = (subst_ty (p_2 p) t2') /\
+          (exists R, (related t1 t2 R) /\ (SN_V t v1' v2' (scons (t1, t2, R) p))))
+      | _, _ => False
+      end
+  end.
+
+
+Definition SN_E {delta} (T : ty delta) (e1 e2 : tm 0 0) (p : type_store delta) : Prop :=
   (has_type 0 (empty_gamma 0) e1 (subst_ty (p_1 p) T)) /\
   (has_type 0 (empty_gamma 0) e2 (subst_ty (p_2 p) T)) /\
-  (exists v1 v2, big_eval e1 v1 /\ big_eval e2 v2).
+  (exists v1 v2, big_eval e1 v1 /\ big_eval e2 v2 /\ (SN_V T v1 v2 p)).
+
+  
