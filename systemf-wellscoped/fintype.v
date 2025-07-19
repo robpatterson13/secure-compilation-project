@@ -25,11 +25,6 @@ Fixpoint fin (n : nat) : Type :=
   | S m => option (fin m)
   end.
 
-Check None : fin 1.
-Check None : fin 1.
-Check Some (Some None) : fin 5.
-
-
 (** Renamings and Injective Renamings
      _Renamings_ are mappings between finite types.
 *)

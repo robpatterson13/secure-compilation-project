@@ -1,4 +1,4 @@
 all: 
 	coqc core.v
-	coqc unscoped.v
+	coqc fintype.v
 	coqc systemf.v
