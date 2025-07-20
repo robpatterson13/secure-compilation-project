@@ -180,6 +180,8 @@ Inductive LR_G { delta : delta_context } : forall m,
 Definition ts_empty : type_store 0 :=
   fun i : fin 0 => match i with end.
 
+Definition s0_ty : fin 0 -> ty 0 := p_1 ts_empty.
+
 Require Import FunctionalExtensionality.
 
 Lemma ts_id1 : p_1 (fun i : fin 0 => match i with end) = var_ty.
@@ -287,6 +289,80 @@ Proof.
          * constructor.   
          * split. constructor. simpl. right. split. reflexivity. reflexivity.
       }
+Qed.
+
+Lemma subst_lemma1 :
+  forall m Delta Gamma e t vs p,
+    LR_D Delta p ->
+    LR_G m vs Gamma p ->
+    has_type Delta Gamma e t ->
+    has_type 0 (empty_gamma 0) (subst_tm (p_1 p) (t_1 vs) e) (subst_ty (p_1 p) t).
+Proof.
+Admitted.
+
+Lemma subst_lemma2 :
+  forall m Delta Gamma e t vs p,
+    LR_D Delta p ->
+    LR_G m vs Gamma p ->
+    has_type Delta Gamma e t ->
+    has_type 0 (empty_gamma 0) (subst_tm (p_2 p) (t_2 vs) e) (subst_ty (p_2 p) t).
+Proof.
+Admitted.
+
+Lemma sn_var :
+  forall delta m Gamma vs p, LR_G m vs Gamma (p : type_store delta) ->
+  forall x, SN_V (Gamma x) (t_1 vs x) (t_2 vs x) p.
+Proof.
+  intros delta m Gamma vs p HG. 
+  induction HG; intros.
+  - destruct x.
+  - destruct x.
+    * simpl. specialize (IHHG f). unfold t_1. unfold t_2. simpl.
+      unfold t_1 in IHHG; unfold t_2 in IHHG. simpl in IHHG. assumption. 
+    * simpl. unfold t_1; unfold t_2. simpl. exact H.
+Qed.
+
+Lemma compatability_var :
+  forall Delta m (Gamma : gamma_context Delta m) n,
+    (related_lr Delta Gamma (vt (var_vl n)) (vt (var_vl n)) (Gamma n)).
+Proof.
+  intros.
+  unfold related_lr.
+  split.
+  constructor.
+  split.
+  constructor. 
+  intros.
+  unfold SN_E.
+  split.
+  asimpl.
+  assert (has_type 0 (empty_gamma 0) (vt (t_1 vs n)) (subst_ty (p_1 p) (Gamma n))) as IHv. { 
+    specialize (subst_lemma1 m Delta Gamma (vt (var_vl n)) (Gamma n) vs p) as Hsl1.
+    asimpl in Hsl1.
+    specialize (T_Var Delta Gamma n) as Htv.
+    specialize (Hsl1 H H0 Htv).
+    assumption.
+  }
+  assumption.
+  split.
+  assert (has_type 0 (empty_gamma 0) (vt (t_2 vs n)) (subst_ty (p_2 p) (Gamma n))) as IHv2. {
+    specialize (subst_lemma2 m Delta Gamma (vt (var_vl n)) (Gamma n) vs p) as Hsl2.
+    asimpl in Hsl2.
+    specialize (T_Var Delta Gamma n) as Htv2.
+    specialize (Hsl2 H H0 Htv2).
+    assumption.
+  }
+  assumption.
+  exists (t_1 vs n). exists (t_2 vs n).
+  split.
+  asimpl.
+  constructor.
+  split.
+  asimpl.
+  constructor.
+  specialize sn_var as Hvar.
+  specialize (Hvar Delta m Gamma vs p H0 n).
+  assumption.
 Qed.
 
 Lemma fundamental : 
