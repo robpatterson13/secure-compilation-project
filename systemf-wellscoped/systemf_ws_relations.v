@@ -161,10 +161,184 @@ Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : P
       end
   end.
 
-
 Definition SN_E {delta} (T : ty delta) (e1 e2 : tm 0 0) (p : type_store delta) : Prop :=
   (has_type 0 (empty_gamma 0) e1 (subst_ty (p_1 p) T)) /\
   (has_type 0 (empty_gamma 0) e2 (subst_ty (p_2 p) T)) /\
   (exists v1 v2, big_eval e1 v1 /\ big_eval e2 v2 /\ (SN_V T v1 v2 p)).
 
+Definition empty_vs : value_store 0 :=
+  fun i => match i with end.
+
+Inductive LR_G { delta : delta_context } : forall m,
+  value_store m -> gamma_context delta m -> type_store delta -> Prop :=
+| G_Empty : forall p, LR_G 0 empty_vs (empty_gamma delta) p
+| G_Cons : forall m Gamma' T o v1 v2 p,
+  LR_G m o Gamma' p -> 
+  SN_V T v1 v2 p ->
+  LR_G (S m) (scons (v1, v2) o) (scons T Gamma') p.
+
+Definition ts_empty : type_store 0 :=
+  fun i : fin 0 => match i with end.
+
+Require Import FunctionalExtensionality.
+
+Lemma ts_id1 : p_1 (fun i : fin 0 => match i with end) = var_ty.
+Proof.
+  unfold p_1, ts_empty.
+  apply functional_extensionality; intros i.
+  destruct i.                        
+Qed.
+
+Lemma ts_id2 : p_2 (fun i : fin 0 => match i with end) = var_ty.
+Proof.
+  unfold p_2, ts_empty.
+  apply functional_extensionality; intros i.
+  destruct i.                        
+Qed.
+
+Lemma vs_id1 : t_1 (fun i : fin 0 => match i with end) = var_vl.
+Proof.
+  unfold t_1, ts_empty.
+  apply functional_extensionality; intros i.
+  destruct i.                        
+Qed.
+
+Lemma vs_id2 : t_2 (fun i : fin 0 => match i with end) = var_vl.
+Proof.
+  unfold t_2, ts_empty.
+  apply functional_extensionality; intros i.
+  destruct i.                        
+Qed.
+
+Lemma test_sub : 
+  forall (e : tm 0 0),
+    (subst_tm var_ty var_vl e) = e.
+Proof.
+  intros.
+  asimpl.
+  reflexivity.
+Qed.
+
+Lemma test_sub2 :
+  forall (e : tm 0 0),
+    (subst_tm (p_1 ts_empty) var_vl e) = e.
+Proof.
+  intros.
+  asimpl.
+  simpl.
+  unfold ts_empty.
+  rewrite ts_id1.
+  asimpl.
+  reflexivity.
+Qed.
   
+Inductive LR_D : forall delta_context, type_store delta_context -> Prop :=
+| D_Empty : LR_D 0 ts_empty 
+| D_Cons : forall Delta' p t1 t2 R,
+  LR_D Delta' p ->
+  related t1 t2 R ->
+  LR_D (S Delta') (scons (t1, t2, R) p).
+
+Definition related_lr (Delta : delta_context) { m : nat } (Gamma : gamma_context Delta m) 
+                      (e1 e2 : tm Delta m) (T : ty Delta) : Prop :=
+  (has_type Delta Gamma e1 T) /\ 
+  (has_type Delta Gamma e2 T) /\
+  (forall p, (LR_D Delta p) ->
+    (forall vs, (LR_G m vs Gamma p) ->  
+      (SN_E T (subst_tm (p_1 p) (t_1 vs) e1)  (subst_tm (p_2 p) (t_2 vs) e2) p))).
+
+Lemma compatability_true :
+  forall Delta m (Gamma : gamma_context Delta m),
+    (related_lr Delta Gamma (vt true) (vt true) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      }
+      {
+       asimpl. split. constructor.
+       - exists true. exists true. split.
+         * constructor.   
+         * split. constructor. constructor. split. reflexivity. reflexivity.
+      }
+Qed.
+
+Lemma compatability_false :
+  forall Delta m (Gamma : gamma_context Delta m),
+    (related_lr Delta Gamma (vt false) (vt false) bool).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - split.
+    * constructor.
+    * intros. constructor.
+      {
+       asimpl. constructor. 
+      } 
+      {
+       asimpl. split. constructor.
+       - exists false. exists false. split.
+         * constructor.   
+         * split. constructor. simpl. right. split. reflexivity. reflexivity.
+      }
+Qed.
+
+Lemma fundamental : 
+  forall Delta m (Gamma : gamma_context Delta m) e t,
+  (has_type Delta Gamma e t) ->
+  (related_lr Delta Gamma e e t).
+Proof.
+Admitted.
+
+Lemma free_theorem_i :
+  forall e t v,
+  (has_type 0 (empty_gamma 0) e ((all (arr (var_ty var_zero) (var_ty var_zero))))) ->
+  (has_type 0 (empty_gamma 0) (vt v) t) ->
+  (big_eval (Core.app (tapp e t) (vt v)) v).
+Proof.
+  intros.
+  specialize (fundamental 0 0 (empty_gamma 0) e (all (arr (var_ty var_zero) (var_ty var_zero))) H) as H_fun.
+  unfold related_lr in H_fun.
+  destruct H_fun. destruct H2.
+  specialize (H3 ts_empty D_Empty empty_vs (G_Empty ts_empty)). unfold SN_E in H3.
+  destruct H3. destruct H4. destruct H5. destruct H5. destruct H5. destruct H6.
+  destruct x; destruct x0; try contradiction.
+  assert (related t t [(v , v)]) as H_rel. {
+    constructor.
+    - unfold well_typed_pair. intros. split; try inversion H8; try subst; try assumption.
+    - constructor.
+  }
+  specialize (H7 t t [(v,v)] H_rel). asimpl in H7.
+  destruct H7. destruct H8. destruct H9. destruct H9.
+  destruct H9. destruct H10. destruct x; destruct x0; try contradiction.
+  unfold p_1 in H11; unfold p_2 in H11. asimpl in H11. destruct H11. destruct H12.
+  inversion H11; subst.
+  asimpl in H13. specialize (H13 v v).
+  destruct H13. simpl. constructor. reflexivity.
+  destruct H12. 
+  destruct H13. 
+  destruct H13. 
+  destruct H13. 
+  destruct H15.
+  simpl in H16.
+  specialize (E_App (tapp e t) (vt v) t t3 v v) as E_A.
+  unfold ts_empty in H5.
+  unfold empty_vs in H5.
+  rewrite ts_id1 in H5.
+  rewrite vs_id1 in H5.
+  asimpl in H5.
+  specialize (E_TApp e t t0 (lam t t3) H5 H9) as E_TA.
+  specialize (E_A E_TA (E_Val v)). inversion H16.
+  - inversion H17; subst. specialize (E_A H13). assumption.
+  - contradiction H17. 
+Qed.
+
+
+
+
