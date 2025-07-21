@@ -1,4 +1,5 @@
 Require Import core fintype systemf.
+
 Require Import List. 
 Import ListNotations.
 Require Import Coq.Logic.FunctionalExtensionality.
@@ -104,14 +105,24 @@ Definition p_2 {delta}
 Definition t_1 {m}
   (vs : value_store m) : fin m -> vl 0 0 :=
     fun i =>
-      let '(v1, _v2) := vs i in
-      v1.
+      match (vs i) with 
+      | (v1, v2) => v1
+      end.
+
+Lemma t_1c : forall m (vs : value_store m),
+  (t_1 vs) = (t_1 vs).
+Proof.
+  intros.
+  unfold t_1.
+  reflexivity.
+Qed.
 
 Definition t_2 {m}
   (vs : value_store m) : fin m -> vl 0 0 :=
     fun i =>
-      let '(_v1, v2) := vs i in
-      v2.
+      match (vs i) with 
+      | (v1, v2) => v2
+      end. 
 
 Definition well_typed_pair (t1 t2 : ty 0) (p : vl 0 0 * vl 0 0) : Prop :=
   forall (v1 v2 : vl 0 0),
@@ -249,6 +260,67 @@ Definition related_lr (Delta : delta_context) { m : nat } (Gamma : gamma_context
     (forall vs, (LR_G m vs Gamma p) ->  
       (SN_E T (subst_tm (p_1 p) (t_1 vs) e1)  (subst_tm (p_2 p) (t_2 vs) e2) p))).
 
+Lemma compatability_app :
+  forall Delta m (Gamma : gamma_context Delta m) e1 e2 t1 t2,
+    related_lr Delta Gamma e1 e1 (arr t1 t2) ->
+    related_lr Delta Gamma e2 e2 t1 ->
+    related_lr Delta Gamma (Core.app e1 e2) (Core.app e1 e2) t2.
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst; inversion H0; subst.
+  specialize (T_App Delta Gamma t1 t2 e1 e2 H1 H3) as HT.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+  destruct H2. specialize (H7 p H5 vs H6). unfold SN_E in H7.
+  specialize (T_App 0 (empty_gamma 0) (subst_ty (p_1 p) t1) (subst_ty (p_1 p) t2) (subst_tm (p_1 p) (t_1 vs) e1) (subst_tm (p_1 p) (t_1 vs) e2)) as HT2.
+  asimpl.
+  asimpl in H7. destruct H7.
+  specialize (HT2 H7).
+  destruct H4. specialize (H9 p H5 vs H6).
+  unfold SN_E in H9.
+  destruct H9.
+  specialize (HT2 H9).
+  split.
+  assumption.
+  specialize (T_App 0 (empty_gamma 0) (subst_ty (p_2 p) t1) (subst_ty (p_2 p) t2) (subst_tm (p_2 p) (t_2 vs) e1) (subst_tm (p_2 p) (t_2 vs) e2)) as HT3.
+  destruct H10.
+  destruct H8.
+  specialize (HT3 H8 H10).
+  split.
+  assumption.
+  destruct H11; destruct H11.
+  destruct H12; destruct H12.
+  destruct H12.
+  destruct H13.
+  specialize (E_App (subst_tm (p_1 p) (t_1 vs) e1) (subst_tm (p_1 p) (t_1 vs) e2)) as HE.
+  destruct x1; try contradiction.
+  destruct x2; try contradiction.
+  simpl in H14.
+  destruct H14.
+  destruct H15.
+  destruct H11. destruct H17.
+  specialize (H16 x x0 H18).
+  destruct H16.
+  destruct H19.
+  destruct H20. destruct H20.
+  destruct H20.
+  destruct H21.
+  specialize (HE t t0 x1).
+  specialize (HE x H12 H11 H20).
+  exists x1.
+  specialize (E_App (subst_tm (p_2 p) (t_2 vs) e1) (subst_tm (p_2 p) (t_2 vs) e2)) as HE2.
+  specialize (HE2 t3 t4 x2 x0 H13 H17 H21).
+  exists x2.
+  split. assumption.
+  split. assumption.
+  assumption.
+Qed.
+
 Lemma compatability_true :
   forall Delta m (Gamma : gamma_context Delta m),
     (related_lr Delta Gamma (vt true) (vt true) bool).
@@ -309,6 +381,15 @@ Lemma subst_lemma2 :
 Proof.
 Admitted.
 
+Lemma subst_var0 :
+  forall T T' e v,
+    has_type 0 (scons T (empty_gamma 0)) e T' ->
+    has_type 0 (empty_gamma 0) (vt v) T ->
+    has_type 0 (empty_gamma 0) (subst_tm var_ty (vsubst v) e) T'.
+Proof.
+  intros.
+Admitted.
+
 Lemma sn_var :
   forall delta m Gamma vs p, LR_G m vs Gamma (p : type_store delta) ->
   forall x, SN_V (Gamma x) (t_1 vs x) (t_2 vs x) p.
@@ -320,6 +401,120 @@ Proof.
     * simpl. specialize (IHHG f). unfold t_1. unfold t_2. simpl.
       unfold t_1 in IHHG; unfold t_2 in IHHG. simpl in IHHG. assumption. 
     * simpl. unfold t_1; unfold t_2. simpl. exact H.
+Qed.
+
+Lemma compatability_lam :
+  forall Delta m (Gamma : gamma_context Delta m) e t t',
+    related_lr Delta (scons t Gamma) e e t' ->
+    related_lr Delta Gamma (vt (lam t e)) (vt (lam t e)) (arr t t').
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst.
+  specialize (T_Lam Delta Gamma t t' e H0) as HL.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+  specialize (T_Lam 0 (empty_gamma 0)) as HL2.
+  specialize (HL2).
+  split. asimpl.
+  specialize (subst_lemma1 m Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
+  asimpl in Hsl1.
+  assumption.
+  split.
+  specialize (subst_lemma2 m Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
+  asimpl in Hsl2.
+  assumption. asimpl. 
+  exists (lam (subst_ty (p_1 p) t)
+          (subst_tm (p_1 p) (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_1 vs))) e)).
+  exists (lam (subst_ty (p_2 p) t)
+          (subst_tm (p_2 p) (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_2 vs))) e)).
+  split. constructor. split. constructor. split. reflexivity.
+  split. reflexivity.
+  intros. split.
+  specialize (subst_lemma1 m Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl1.
+  inversion Hsl1; subst. asimpl in H6. simpl. asimpl.
+  specialize (subst_var0 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p)
+          (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_1 vs))) e) v1' H6) as Hsv1.
+  asimpl in Hsv1.
+  simpl in Hsv1. apply Hsv1. 
+  pose (vs1 := (scons (v1', v2') (empty_vs))).
+  assert (LR_G 1 vs1 (scons t (empty_gamma Delta)) p) as Hsg. {
+    apply G_Cons.
+    - apply G_Empty.
+    - exact H4.                      
+  }
+  assert (has_type Delta (scons t (empty_gamma Delta)) (vt (var_vl var_zero)) t) as Hvar0. {
+    apply T_Var.
+  }
+  specialize (subst_lemma1 1 Delta (scons t (empty_gamma Delta)) (vt (var_vl var_zero)) t vs1 p H2 Hsg Hvar0) as winner.
+  simpl in winner. assumption.
+  split.
+  specialize (subst_lemma2 m Delta Gamma (vt (lam t e)) (arr t t') vs p H2 H3 HL) as Hsl2.
+  inversion Hsl2; subst. asimpl in H6. simpl. asimpl.
+  unfold funcomp. simpl. asimpl. simpl. 
+  specialize (subst_var0 (subst_ty (p_2 p) t) (subst_ty (p_2 p) t') (subst_tm (p_2 p)
+          (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_2 vs))) e) v2' H6) as Hsv2.
+  asimpl in Hsv2. unfold funcomp in Hsv2. simpl in Hsv2. asimpl in Hsv2.
+  simpl in Hsv2. apply Hsv2.
+  pose (vs1 := (scons (v1', v2') empty_vs)).
+  assert (LR_G 1 vs1 (scons t (empty_gamma Delta)) p) as Hsg. {
+    apply G_Cons.
+    - apply G_Empty.
+    - exact H4.                      
+  }
+  assert (has_type Delta (scons t (empty_gamma Delta)) (vt (var_vl var_zero)) t) as Hvar0. {
+    apply T_Var. 
+  }
+  specialize (subst_lemma2 1 Delta (scons t (empty_gamma Delta))  (vt (var_vl var_zero)) t vs1 p H2 Hsg Hvar0) as winner2.
+  simpl in winner2. assumption.
+  destruct H1. specialize (H5 p H2 (scons (v1', v2') vs)).
+  specialize (G_Cons m Gamma t vs v1' v2' p H3 H4) as Hcons1.
+  specialize (H5 Hcons1). unfold SN_E in H5.
+  destruct H5.
+  destruct H6.
+  simpl in H7.
+  destruct H7 as [v1].
+  destruct H7 as [v2].
+  destruct H7 as [BE1 BE2].
+  exists v1, v2.
+  assert (big_eval (subst_tm (p_1 p) (scons v1' (t_1 vs)) e) v1 = big_eval
+  (subst_tm var_ty (vsubst v1')
+     (subst_tm (p_1 p) (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_1 vs))) e)) v1) as Heq. {
+    asimpl. simpl. unfold funcomp. simpl. asimpl.
+    reflexivity.
+  }
+  assert (big_eval (subst_tm (p_2 p) (scons v2' (t_2 vs)) e) v2 = big_eval
+  (subst_tm var_ty (vsubst v2')
+     (subst_tm (p_2 p) (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_2 vs))) e)) v2) as Heq2. {
+    asimpl. simpl. unfold funcomp. simpl. asimpl. reflexivity.
+  }
+   assert ((t_1 (scons (v1', v2') vs)) = (scons v1' (t_1 vs)))as Hbe1. {
+    unfold t_1.
+
+    apply functional_extensionality.
+    intros.
+    destruct x. simpl.
+    reflexivity.
+    simpl.
+    reflexivity.
+  }
+  assert ((t_2 (scons (v1', v2') vs)) = (scons v2' (t_2 vs)))as Hbe2. {
+    unfold t_2.
+    apply functional_extensionality.
+    intros.
+    destruct x. asimpl.
+    reflexivity.
+    asimpl.
+    reflexivity.
+  }
+  repeat split.
+  - asimpl. asimpl in Heq. rewrite <- Heq. rewrite <- Hbe1. assumption.
+  - asimpl. asimpl in Heq2. rewrite <- Heq2. destruct BE2. rewrite <- Hbe2. assumption.
+  - destruct BE2. apply H8.
 Qed.
 
 Lemma compatability_var :
