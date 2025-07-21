@@ -404,31 +404,30 @@ Proof.
 Qed.
 
 Lemma compatability_pack :
-  forall Delta Gamma e t t',
+  forall Delta m (Gamma : gamma_context Delta m) e t t',
     related_lr Delta Gamma (vt e) (vt e) (subst_ty (tsubst t') t) ->
-    well_formed_type Delta t' ->
     related_lr Delta Gamma (vt (pack t' e)) (vt (pack t' e)) (ex t).
 Proof.
   intros.
   unfold related_lr.
   inversion H; subst.
   specialize (T_Pack) as Hp.
-  specialize (Hp Delta Gamma e t t' H1 H0).
+  specialize (Hp Delta m Gamma e t t' H0).
   repeat split.
   assumption.
   assumption.
-  specialize (subst_lemma1 Delta Gamma (vt (pack t' e)) (ex t) vs p H3 H4 Hp) as Hs1.
+  specialize (subst_lemma1 m Delta Gamma (vt (pack t' e)) (ex t) vs p H2 H3 Hp) as Hs1.
   assumption.
-  specialize (subst_lemma2 Delta Gamma (vt (pack t' e)) (ex t) vs p H3 H4 Hp) as Hs2.
+  specialize (subst_lemma2 m Delta Gamma (vt (pack t' e)) (ex t) vs p H2 H3 Hp) as Hs2.
   assumption.
-  destruct H2.
-  specialize (H5 p H3 vs H4).
-  unfold SN_E in H5.
+  destruct H1.
+  specialize (H4 p H2 vs H3).
+  unfold SN_E in H4.
+  destruct H4.
   destruct H5.
+  destruct H6. destruct H6.
   destruct H6.
-  destruct H7. destruct H7.
-  destruct H7.
-  destruct H8.
+  destruct H.
   asimpl.
   exists (pack (subst_ty (p_1 p) t') (subst_vl (p_1 p) (t_1 vs) e)).
   exists (pack (subst_ty (p_2 p) t') (subst_vl (p_2 p) (t_2 vs) e)).
@@ -440,7 +439,7 @@ Proof.
   repeat split.
   exists [].
   repeat split.
-  constructor.
+  constructor. 
   
 Admitted.
 
