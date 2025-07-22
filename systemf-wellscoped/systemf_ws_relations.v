@@ -403,6 +403,118 @@ Proof.
     * simpl. unfold t_1; unfold t_2. simpl. exact H.
 Qed.
 
+Lemma compatability_tlam :
+  forall Delta m (Gamma : gamma_context Delta m) e t,
+    related_lr (S Delta) (lift_gamma Gamma) e e t ->
+    related_lr Delta Gamma (vt (tlam e)) (vt (tlam e)) (all t).
+Proof.
+  intros.
+  unfold related_lr.
+  inversion H; subst. destruct H1.
+  specialize (T_TLam Delta Gamma t e H0) as Htl.
+  split.
+  assumption.
+  split.
+  assumption.
+  intros.
+  unfold SN_E.
+
+  repeat split.
+  - specialize (subst_lemma1 m Delta Gamma (vt (tlam e)) (all t) vs p H3 H4 Htl) as Hsl1.
+    assumption.
+  - specialize (subst_lemma2 m Delta Gamma (vt (tlam e)) (all t) vs p H3 H4 Htl) as Hsl2.
+    assumption.
+  - unfold SN_E in H2.
+    asimpl. 
+    exists (tlam (subst_tm (scons (var_ty var_zero) (funcomp (ren_ty shift) (p_1 p))) (funcomp (ren_vl shift id) (t_1 vs)) e)).
+    exists (tlam (subst_tm (scons (var_ty var_zero) (funcomp (ren_ty shift) (p_2 p))) (funcomp (ren_vl shift id) (t_2 vs)) e)).
+    split. constructor. split. constructor. repeat split.
+    * asimpl. simpl. 
+      inversion Htl; subst. unfold funcomp. simpl. asimpl. 
+      assert (Hsd : LR_D (S Delta) (scons (t1, t2, R) p)). {
+        apply D_Cons.
+        - assumption.
+        - assumption.
+      }
+      specialize (H2 (scons (t1, t2, R) p) Hsd vs).
+      assert (Hg1 : LR_G m vs (lift_gamma Gamma) (scons (t1, t2, R) p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      simpl in H2.
+      destruct H2.
+      destruct H6.
+      inversion Htl; subst. asimpl in H2.
+      assert ((p_1 (scons (t1, t2, R) p)) = (scons t1 (p_1 p))) as Hsame. {
+        unfold p_1.
+        apply functional_extensionality.
+        intros.
+        destruct x. simpl. reflexivity. reflexivity. 
+      }
+      rewrite <- Hsame.
+      assumption.
+    * asimpl. simpl. 
+      inversion Htl; subst. unfold funcomp. simpl. asimpl. 
+      assert (Hsd : LR_D (S Delta) (scons (t1, t2, R) p)). {
+        apply D_Cons.
+        - assumption.
+        - assumption.
+      }
+      specialize (H2 (scons (t1, t2, R) p) Hsd vs).
+      assert (Hg1 : LR_G m vs (lift_gamma Gamma) (scons (t1, t2, R) p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      simpl in H2.
+      destruct H2.
+      destruct H6.
+      inversion Htl; subst.
+      assert ((p_2 (scons (t1, t2, R) p)) = (scons t2 (p_2 p))) as Hsame. {
+        unfold p_2.
+        apply functional_extensionality.
+        intros.
+        destruct x. simpl. reflexivity. simpl. reflexivity. 
+      }
+      rewrite <- Hsame.
+      assumption.
+    * specialize (H2 (scons (t1, t2, R) p)).
+      specialize (D_Cons Delta p t1 t2 R) as Hdc.
+      specialize (Hdc H3 H5).
+      specialize (H2 Hdc vs).
+      assert (Hg1 : LR_G m vs (lift_gamma Gamma) (scons (t1, t2, R) p)). {
+          admit.
+      }
+      specialize (H2 Hg1).
+      destruct H2.
+      destruct H6.
+      destruct H7. destruct H7.
+      exists x, x0.
+      destruct H7.
+      destruct H8.
+      repeat split.
+      asimpl. simpl. unfold funcomp. simpl. asimpl. simpl in H7.
+      assert ((scons t1 (p_1 p) = (p_1 (scons (t1, t2, R) p)))) as Hz. {
+        unfold p_1.
+        apply functional_extensionality.
+        intros. destruct x1.
+        - simpl. reflexivity.
+        - simpl. reflexivity.
+      }
+      rewrite Hz.
+      assumption.
+      asimpl. simpl. unfold funcomp. simpl. asimpl. simpl in H7. 
+      assert ((scons t2 (p_2 p) = (p_2 (scons (t1, t2, R) p)))) as Hz. {
+        unfold p_2.
+        apply functional_extensionality.
+        intros. destruct x1.
+        - simpl. reflexivity.
+        - simpl. reflexivity.
+      }
+      rewrite Hz.
+      assumption.
+      assumption.
+Admitted.
+
 Lemma compatability_pack :
   forall Delta m (Gamma : gamma_context Delta m) e t t',
     related_lr Delta Gamma (vt e) (vt e) (subst_ty (tsubst t') t) ->
@@ -437,9 +549,16 @@ Proof.
   simpl.
   exists t', t'.
   repeat split.
+  destruct H8.
+  specialize (H9 p H2 vs H3).
+  unfold SN_E in H9. destruct H9. destruct H10. destruct H11. destruct H11. destruct H11.
+  destruct H12. asimpl in H11. asimpl in H12. inversion H11; subst. inversion H12; subst.
   exists [].
   repeat split.
-  constructor. 
+  constructor.
+  asimpl.
+
+  (* Compositionality needed from here *)
   
 Admitted.
 
@@ -534,7 +653,6 @@ Proof.
   }
    assert ((t_1 (scons (v1', v2') vs)) = (scons v1' (t_1 vs)))as Hbe1. {
     unfold t_1.
-
     apply functional_extensionality.
     intros.
     destruct x. simpl.
