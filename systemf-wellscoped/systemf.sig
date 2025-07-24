@@ -12,8 +12,8 @@ tapp : tm -> ty -> tm
 vt   : vl -> tm
 unpack : tm -> (bind ty, vl in tm) -> tm
 
-true : vl
 false : vl
+true : vl
 lam  : ty -> (bind vl in tm) -> vl
 tlam : (bind ty in tm) -> vl
 pack : ty -> vl -> vl

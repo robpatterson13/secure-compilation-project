@@ -11,10 +11,10 @@ Definition delta_context : Type := nat.
 
 Definition gamma_context (delta : delta_context) (m : nat) := fin m -> ty delta.
 
-Definition prelation (delta : delta_context) ( m : nat ) : Type := list (vl delta m * vl delta m).
+Definition prelation : Type := vl 0 0 -> vl 0 0 -> Prop.
 
 Definition type_store (delta : delta_context) : Type := 
-  (fin delta) -> (ty 0 * ty 0 * prelation 0 0).
+  (fin delta) -> (ty 0 * ty 0 * prelation).
 
 Definition value_store (m : nat) : Type := (fin m) -> vl 0 0 * vl 0 0.
 
@@ -124,15 +124,16 @@ Definition t_2 {m}
       | (v1, v2) => v2
       end. 
 
-Definition well_typed_pair (t1 t2 : ty 0) (p : vl 0 0 * vl 0 0) : Prop :=
-  forall (v1 v2 : vl 0 0),
-    p = (v1, v2) ->
-    has_type 0 (empty_gamma 0) (vt v1) t1 /\ has_type 0 (empty_gamma 0) (vt v2) t2.
+Definition well_typed_pair (t1 t2 : ty 0) (v1 v2 : vl 0 0) : Prop :=
+    has_type 0 (empty_gamma 0) (vt v1) t1 /\ 
+    has_type 0 (empty_gamma 0) (vt v2) t2.
 
-Definition related (t1 t2 : ty 0) (R : prelation 0 0) : Prop :=
-  Forall (well_typed_pair t1 t2) R. 
+Definition related (t1 t2 : ty 0) (R : prelation) : Prop :=
+  forall v1 v2,
+    R v1 v2 ->
+    well_typed_pair t1 t2 v1 v2.
 
-Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : Prop :=
+Fixpoint SN_V {delta} (T : ty delta) (p : type_store delta) (v1 v2 : vl 0 0) : Prop :=
   match T with
   | (Core.bool)  => (v1 = true /\ v2 = true) \/ (v1 = false /\ v2 = false)
   | (arr t1 t2) =>
@@ -140,17 +141,17 @@ Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : P
       | (lam t1' b1), (lam t2' b2) => 
         t1' = (subst_ty (p_1 p) t1) /\
         t2' = (subst_ty (p_2 p) t1) /\
-        (forall v1' v2', (SN_V t1 v1' v2' p) ->
+        (forall v1' v2', (SN_V t1 p v1' v2') ->
         ((has_type 0 (empty_gamma 0) (subst_tm var_ty (vsubst v1') b1) (subst_ty (p_1 p) t2)) /\
          (has_type 0 (empty_gamma 0) (subst_tm var_ty (vsubst v2') b2) (subst_ty (p_2 p) t2)) /\
          (exists v1 v2, big_eval (subst_tm var_ty (vsubst v1') b1) v1 /\
                         big_eval (subst_tm var_ty (vsubst v2') b2) v2 /\ 
-                        (SN_V t2 v1 v2 p))))
+                        (SN_V t2 p v1 v2))))
       | _, _ => False
       end
   | (var_ty n) => 
       let '(T1,T2,R) := p n in
-      In (v1,v2) R
+      R v1 v2
   | (all t) => 
         match v1, v2 with
         | (tlam b1), (tlam b2) =>
@@ -160,14 +161,14 @@ Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : P
                   (has_type 0 (empty_gamma 0) (subst_tm (tsubst t2) var_vl b2) (subst_ty (p_2 (scons (t1, t2, R) p)) t)) /\
                   (exists v1 v2, big_eval (subst_tm (tsubst t1) var_vl b1) v1 /\ 
                                  big_eval (subst_tm (tsubst t2) var_vl b2) v2 /\ 
-                                 (SN_V t v1 v2 (scons (t1, t2, R) p)))))
+                                 (SN_V t (scons (t1, t2, R) p) v1 v2))))
         | _, _ => False
         end
   | (ex t) => 
       match v1, v2 with  
       | (pack t1 v1'), (pack t2 v2') =>
         (exists t1' t2', t1 = (subst_ty (p_1 p) t1') /\ t2 = (subst_ty (p_2 p) t2') /\
-          (exists R, (related t1 t2 R) /\ (SN_V t v1' v2' (scons (t1, t2, R) p))))
+          (exists R, (related t1 t2 R) /\ (SN_V t (scons (t1, t2, R) p) v1' v2')))
       | _, _ => False
       end
   end.
@@ -175,7 +176,7 @@ Fixpoint SN_V {delta} (T : ty delta) (v1 v2 : vl 0 0) (p : type_store delta) : P
 Definition SN_E {delta} (T : ty delta) (e1 e2 : tm 0 0) (p : type_store delta) : Prop :=
   (has_type 0 (empty_gamma 0) e1 (subst_ty (p_1 p) T)) /\
   (has_type 0 (empty_gamma 0) e2 (subst_ty (p_2 p) T)) /\
-  (exists v1 v2, big_eval e1 v1 /\ big_eval e2 v2 /\ (SN_V T v1 v2 p)).
+  (exists v1 v2, big_eval e1 v1 /\ big_eval e2 v2 /\ (SN_V T p v1 v2)).
 
 Definition empty_vs : value_store 0 :=
   fun i => match i with end.
@@ -185,7 +186,7 @@ Inductive LR_G { delta : delta_context } : forall m,
 | G_Empty : forall p, LR_G 0 empty_vs (empty_gamma delta) p
 | G_Cons : forall m Gamma' T o v1 v2 p,
   LR_G m o Gamma' p -> 
-  SN_V T v1 v2 p ->
+  SN_V T p v1 v2 ->
   LR_G (S m) (scons (v1, v2) o) (scons T Gamma') p.
 
 Definition ts_empty : type_store 0 :=
@@ -392,7 +393,7 @@ Admitted.
 
 Lemma sn_var :
   forall delta m Gamma vs p, LR_G m vs Gamma (p : type_store delta) ->
-  forall x, SN_V (Gamma x) (t_1 vs x) (t_2 vs x) p.
+  forall x, SN_V (Gamma x) p (t_1 vs x) (t_2 vs x).
 Proof.
   intros delta m Gamma vs p HG. 
   induction HG; intros.
@@ -401,6 +402,39 @@ Proof.
     * simpl. specialize (IHHG f). unfold t_1. unfold t_2. simpl.
       unfold t_1 in IHHG; unfold t_2 in IHHG. simpl in IHHG. assumption. 
     * simpl. unfold t_1; unfold t_2. simpl. exact H.
+Qed.
+
+Lemma snv_shift : 
+  forall delta T (p : type_store delta) v1 v2 t1 t2 R,
+    SN_V T p v1 v2 ->
+    SN_V (ren_ty shift T) (scons (t1, t2, R) p) v1 v2.
+Proof.
+Admitted.
+  
+Lemma lrg_lift : 
+  forall delta m vs (Gamma : gamma_context delta m) p t1 t2 R,
+    LR_G m vs Gamma p ->
+    LR_G m vs (lift_gamma Gamma) (scons (t1, t2, R) p).
+Proof.
+  intros.
+  induction H.
+  - specialize (G_Empty (scons (t1, t2, R) p)) as Hge. 
+    assert ((empty_gamma (S delta)) = (lift_gamma (empty_gamma delta))) as Hg. {
+      apply functional_extensionality.
+      intros. destruct x.
+    }
+    rewrite <- Hg. assumption.
+  - specialize (G_Cons m (lift_gamma Gamma') (ren_ty shift T) o v1 v2 (scons (t1, t2, R) p)) as Hg2.
+    specialize (Hg2 IHLR_G). specialize (snv_shift delta T p v1 v2 t1 t2 R H0) as Hs.
+    specialize (Hg2 Hs).
+    assert ((scons (ren_ty shift T) (lift_gamma Gamma')) = (lift_gamma (scons T Gamma'))) as Hn. {
+      apply functional_extensionality.
+      intros.
+      destruct x.
+      - reflexivity.
+      - reflexivity.
+    }
+    rewrite <- Hn. assumption.
 Qed.
 
 Lemma compatability_tlam :
@@ -438,7 +472,8 @@ Proof.
       }
       specialize (H2 (scons (t1, t2, R) p) Hsd vs).
       assert (Hg1 : LR_G m vs (lift_gamma Gamma) (scons (t1, t2, R) p)). {
-          admit.
+          specialize (lrg_lift Delta m vs Gamma p t1 t2 R H4) as Hl.
+          assumption.
       }
       specialize (H2 Hg1).
       simpl in H2.
@@ -553,10 +588,6 @@ Proof.
   specialize (H9 p H2 vs H3).
   unfold SN_E in H9. destruct H9. destruct H10. destruct H11. destruct H11. destruct H11.
   destruct H12. asimpl in H11. asimpl in H12. inversion H11; subst. inversion H12; subst.
-  exists [].
-  repeat split.
-  constructor.
-  asimpl.
 
   (* Compositionality needed from here *)
   
@@ -599,7 +630,7 @@ Proof.
   specialize (subst_var0 (subst_ty (p_1 p) t) (subst_ty (p_1 p) t') (subst_tm (p_1 p)
           (scons (var_vl var_zero) (funcomp (ren_vl id shift) (t_1 vs))) e) v1' H6) as Hsv1.
   asimpl in Hsv1.
-  simpl in Hsv1. apply Hsv1. 
+  simpl in Hsv1. apply Hsv1.
   pose (vs1 := (scons (v1', v2') (empty_vs))).
   assert (LR_G 1 vs1 (scons t (empty_gamma Delta)) p) as Hsg. {
     apply G_Cons.
