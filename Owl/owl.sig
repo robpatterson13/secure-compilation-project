@@ -1,0 +1,73 @@
+nat : Type
+list : Functor
+
+label : Type
+constr : Type
+ty : Type
+vl : Type
+tm : Type
+cond_sym : Type
+binary : Type
+
+bzero : binary -> binary
+bone : binary -> binary
+bend : binary
+
+leq : cond_sym
+geq : cond_sym
+gt : cond_sym
+lt : cond_sym
+
+nleq : cond_sym
+ngeq : cond_sym
+ngt : cond_sym
+nlt : cond_sym
+
+condition : cond_sym -> label -> label -> constr
+
+adv : label
+ljoin : label -> label -> label
+lmeet : label -> label -> label
+
+Any : ty
+Unit : ty
+Data : label -> ty
+Ref : ty -> ty
+arr : ty -> ty -> ty
+prod : ty -> ty -> ty
+sum : ty -> ty -> ty
+all : ty -> (bind ty in ty) -> ty
+ex : ty -> (bind ty in ty) -> ty
+all_l : cond_sym -> label -> (bind label in ty) -> ty
+t_if : constr -> ty -> ty -> ty
+
+error : vl
+skip : vl
+bitstring : binary -> vl
+loc : nat -> vl
+fix : (bind vl, vl in tm) -> vl
+tlam : (bind ty in tm) -> vl
+l_lam : (bind label in tm) -> vl
+
+vt : vl -> tm
+
+op : tm -> "list" (tm) -> tm
+
+zero : tm -> tm
+app : tm -> tm -> tm
+alloc : tm -> tm
+dealloc : tm -> tm
+assign : tm -> tm -> tm
+tm_pair : tm -> tm -> tm
+left_tm : tm -> tm
+right_tm : tm -> tm
+inl : tm -> tm
+inr : tm -> tm
+case : tm -> (bind tm in tm) -> (bind tm in tm) -> tm
+tapp : tm -> ty -> tm
+lapp : tm -> label -> tm
+pack : tm -> tm
+unpack : tm -> (bind tm in tm) -> tm
+if_tm : tm -> tm -> tm -> tm
+if_c : constr -> tm -> tm -> tm
+sync : tm -> tm
