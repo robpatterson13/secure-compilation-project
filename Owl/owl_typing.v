@@ -131,6 +131,12 @@ Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l 
 | r_deref : forall n memory v,
   memory n = Some v ->
   reduction (dealloc (loc n), memory) (v, memory)
+| r_assign : forall n v memory,
+  is_value v ->
+  reduction (assign (loc n) v, memory) (skip, (allocate n v memory))
+| r_fix : forall e v memory,
+  is_value v ->
+  reduction (Core.app (fixlam e) v, memory) ((subst_tm var_label var_ty (scons v (scons (fixlam e) var_tm)) e), memory)
 | r_lapp : forall e l memory,
   reduction (lapp (l_lam e) l, memory) ((subst_tm (scons l var_label) var_ty var_tm e), memory).
   
