@@ -4,7 +4,6 @@ list : Functor
 label : Type
 constr : Type
 ty : Type
-vl : Type
 tm : Type
 cond_sym : Type
 binary : Type
@@ -41,15 +40,13 @@ ex : ty -> (bind ty in ty) -> ty
 all_l : cond_sym -> label -> (bind label in ty) -> ty
 t_if : constr -> ty -> ty -> ty
 
-error : vl
-skip : vl
-bitstring : binary -> vl
-loc : nat -> vl
-fix : (bind vl, vl in tm) -> vl
-tlam : (bind ty in tm) -> vl
-l_lam : (bind label in tm) -> vl
-
-vt : vl -> tm
+error : tm
+skip : tm
+bitstring : binary -> tm
+loc : nat -> tm
+fixlam : (bind tm, tm in tm) -> tm
+tlam : (bind ty in tm) -> tm
+l_lam : (bind label in tm) -> tm
 
 op : tm -> "list" (tm) -> tm
 

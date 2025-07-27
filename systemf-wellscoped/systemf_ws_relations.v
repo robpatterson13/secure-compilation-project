@@ -5,6 +5,8 @@ Import ListNotations.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 
+Check Set.
+
 (* delta is typically the number of type variables, while m is typically the number of value variables *)
 
 Definition delta_context : Type := nat.
