@@ -130,6 +130,7 @@ Parameter valid_constraint : forall {l}, constr l -> Prop.
 Axiom fresh_not_allocated :
   forall {l d m} (memory : mem l d m), memory (fresh memory) = None.
 
+(* General logic for non error reductions, and how they function *)
 Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
 | r_zero : forall b memory, 
   reduction (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
@@ -180,11 +181,13 @@ Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l 
   not (valid_constraint c) ->
   reduction (if_c c e1 e2, memory) (e2, memory).
 
+(* To check if an evaluation is unable to continue/is malformed *)
 Definition stuck { l d m } (v : tm l d m) (memory : mem l d m) :=
   not (is_value v) /\
       (forall v' memory',
         not (reduction (v, memory) (v', memory'))).
 
+(* General logic reducing a term within a context, also allowing the error case to function *)
 Inductive gen_reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
 | gr_reduce : forall v memory v' memory',
   reduction (v, memory) (v', memory') ->
@@ -193,6 +196,8 @@ Inductive gen_reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * me
   stuck v memory ->
   gen_reduction (v, memory) (error, memory).
 
+
+(* General logic for evaluating a term down: create a context and evaluate it *)
 Inductive step { l d m : nat } : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop :=
 | step_ctx : forall K e memory e' memory',
   gen_reduction (e, memory) (e', memory') ->
