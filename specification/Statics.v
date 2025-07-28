@@ -1,6 +1,6 @@
 From Coq Require Import Strings.String.
 Require Import List.
-Import ListNotations.
+Import ListNotations .
 Require Import Dynamics.
 
 Inductive ty := 
@@ -10,42 +10,54 @@ Inductive ty :=
 
 Scheme Equality for ty.
 
-Record Lattice := {
-    carrier : Set;
-    le : carrier -> carrier -> bool;
-    max : carrier -> carrier -> carrier;
-    return_max: forall t1 t2, max t1 t2 = t1 \/ max t1 t2 = t2;
-    order_max: forall t1 t2, max t1 t2 = max t2 t1;
-    bot : carrier;
-    bot_le : forall x, le bot x = true;
-    refl_le : forall t, le t t = true;
-    assym_le : forall t1 t2, le t1 t2 = true -> le t2 t1 = true -> t1 = t2;
-    max_le: forall t1 t2 t3, le t1 t2 = false -> max t3 t1 = t3 -> le t3 t2 = false
-}.
-
 Section Types.
   Variable (L : Lattice).
 
-Definition context : Type := list (string *  (L.(carrier))). 
+Inductive type : Type :=
+| nat_L : L.(carrier) -> type
+| bool_L : L.(carrier) -> type.
 
-Inductive has_type : context -> tm -> L.(carrier) -> Prop :=
+Definition context : Type := list (string *  (type)). 
+
+Inductive has_type : context -> tm L -> type -> Prop :=
 | T_Var : forall Gamma x t1,
     lookup Gamma x = Some t1 ->
-    has_type Gamma (tm_var x) t1
-| T_Val : forall Gamma v,
-    has_type Gamma (tm_val v) L.(bot)
-| T_Un : forall Gamma e t,
-    has_type Gamma e t ->
-    has_type Gamma (tm_un e) t
-| T_Bin : forall Gamma e1 e2 t1 t2,
-    has_type Gamma e1 t1 ->
-    has_type Gamma e2 t2 ->
-    has_type Gamma (tm_bin e1 e2) (L.(max) t1 t2)
+    has_type Gamma (tm_var L x) t1
+| T_Val_Nat : forall Gamma v,
+    has_type Gamma (tm_val L (VNat v)) (nat_L L.(bot))
+| T_Val_Bool : forall Gamma b,
+    has_type Gamma (tm_val L (VBool b)) (bool_L L.(bot))
+| T_Un_Not : forall Gamma e l,
+    has_type Gamma e (bool_L l) ->
+    has_type Gamma (tm_un_not L e) (bool_L l)
+| T_Bin_And : forall Gamma e1 e2 l1 l2,
+    has_type Gamma e1 (bool_L l1) ->
+    has_type Gamma e2 (bool_L l2) ->
+    has_type Gamma (tm_bin_and L e1 e2) (bool_L (L.(max) l1 l2))
+| T_Bin_Add : forall Gamma e1 e2 l1 l2,
+    has_type Gamma e1 (nat_L l1) ->
+    has_type Gamma e2 (nat_L l2) ->
+    has_type Gamma (tm_bin_add L e1 e2) (nat_L (L.(max) l1 l2))
 | T_Let : forall Gamma e1 e2 x t1 t2,
     has_type Gamma e1 t1 ->
     has_type (update Gamma x t1) e2 t2 ->
-    has_type Gamma (tm_let x e1 e2) t2.
-
+    has_type Gamma (tm_let L x e1 e2) t2
+| T_Declass_Nat : forall Gamma e l Label,
+    has_type Gamma e (nat_L l) ->
+    has_type Gamma (tm_declass L e Label) (nat_L Label)
+| T_Declass_Bool : forall Gamma e l Label,
+    has_type Gamma e (bool_L l) ->
+    has_type Gamma (tm_declass L e Label) (bool_L Label)
+| T_If_Nat : forall Gamma b e1 e2 l1 l2,
+    has_type Gamma b (bool_L L.(bot)) ->
+    has_type Gamma e1 (nat_L l1) ->
+    has_type Gamma e2 (nat_L l2) ->
+    has_type Gamma (tm_if L b e1 e2) (nat_L (L.(max) l1 l2))
+| T_If_Bool : forall Gamma b e1 e2 l1 l2,
+    has_type Gamma b (bool_L L.(bot)) ->
+    has_type Gamma e1 (bool_L l1) ->
+    has_type Gamma e2 (bool_L l2) ->
+    has_type Gamma (tm_if L b e1 e2) (bool_L (L.(max) l1 l2)).
 
 Definition base_max (t1 : ty) (t2 : ty) :=
   match t1, t2 with
