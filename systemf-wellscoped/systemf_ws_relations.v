@@ -92,12 +92,6 @@ Inductive big_eval {delta m : nat} : tm delta m -> vl delta m -> Prop :=
     big_eval (subst_tm (tsubst t') (vsubst v) e) v1 ->
     big_eval (unpack (vt (pack t' v)) e) v1.
 
-Lemma test_eval :
-  forall v,
-  big_eval (vt v) v.
-Proof.
-
-
 Definition p_1 {delta}
   (ts : type_store delta) : fin delta -> ty 0 :=
   fun i =>
