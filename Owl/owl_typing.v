@@ -130,101 +130,103 @@ Parameter valid_constraint : forall {l}, constr l -> Prop.
 Axiom fresh_not_allocated :
   forall {l d m} (memory : mem l d m), memory (fresh memory) = None.
 
-Inductive reduction (l d m : nat) : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
+Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
 | r_zero : forall b memory, 
-  reduction l d m (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
+  reduction (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
 | r_ift : forall b e1 e2 memory, 
   all_zero b -> 
-  reduction l d m (if_tm (bitstring b) e1 e2, memory) (e1, memory)
+  reduction (if_tm (bitstring b) e1 e2, memory) (e1, memory)
 | r_iff : forall b e1 e2 memory, 
   (not (all_zero b)) -> 
-  reduction l d m (if_tm (bitstring b) e1 e2, memory) (e2, memory)
+  reduction (if_tm (bitstring b) e1 e2, memory) (e2, memory)
 | r_alloc : forall v memory,
   is_value v ->
   let res := (fresh memory) in
-  reduction l d m (alloc v, memory) (loc res, (allocate res v memory))
+  reduction (alloc v, memory) (loc res, (allocate res v memory))
 | r_deref : forall n memory v,
   memory n = Some v ->
-  reduction l d m (dealloc (loc n), memory) (v, memory)
+  reduction (dealloc (loc n), memory) (v, memory)
 | r_assign : forall n v memory,
   is_value v ->
-  reduction l d m (assign (loc n) v, memory) (skip, (allocate n v memory))
+  reduction (assign (loc n) v, memory) (skip, (allocate n v memory))
 | r_fix : forall e v memory,
   is_value v ->
-  reduction l d m (Core.app (fixlam e) v, memory) ((subst_tm var_label var_ty (scons v (scons (fixlam e) var_tm)) e), memory)
+  reduction (Core.app (fixlam e) v, memory) ((subst_tm var_label var_ty (scons v (scons (fixlam e) var_tm)) e), memory)
 | r_pair_l : forall v1 v2 memory,
   is_value v1 ->
   is_value v2 ->
-  reduction l d m (left_tm (tm_pair v1 v2), memory) (v1, memory)
+  reduction (left_tm (tm_pair v1 v2), memory) (v1, memory)
 | r_pair_r : forall v1 v2 memory,
   is_value v1 ->
   is_value v2 ->
-  reduction l d m (right_tm (tm_pair v1 v2), memory) (v2, memory)
+  reduction (right_tm (tm_pair v1 v2), memory) (v2, memory)
 | r_case_l : forall v e1 e2 memory,
   is_value v ->
-  reduction l d m (case (inl v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e1, memory)
+  reduction (case (inl v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e1, memory)
 | r_case_r : forall v e1 e2 memory,
   is_value v ->
-  reduction l d m (case (inr v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e2, memory)
+  reduction (case (inr v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e2, memory)
 | r_tapp : forall e t memory,
-  reduction l d m (tapp (tlam e) t, memory) (subst_tm var_label (scons t var_ty) var_tm e, memory)
+  reduction (tapp (tlam e) t, memory) (subst_tm var_label (scons t var_ty) var_tm e, memory)
 | r_lapp : forall e lab memory,
-  reduction l d m (lapp (l_lam e) lab, memory) ((subst_tm (scons lab var_label) var_ty var_tm e), memory)
+  reduction (lapp (l_lam e) lab, memory) ((subst_tm (scons lab var_label) var_ty var_tm e), memory)
 | r_unpack : forall v e memory,
   is_value v ->
-  reduction l d m (unpack (pack v) e, memory) (subst_tm var_label var_ty (scons v var_tm) e, memory)
+  reduction (unpack (pack v) e, memory) (subst_tm var_label var_ty (scons v var_tm) e, memory)
 | r_iflt : forall c e1 e2 memory,
   valid_constraint c ->
-  reduction l d m (if_c c e1 e2, memory) (e1, memory)
+  reduction (if_c c e1 e2, memory) (e1, memory)
 | r_iflf : forall c e1 e2 memory,
   not (valid_constraint c) ->
-  reduction l d m (if_c c e1 e2, memory) (e2, memory).
+  reduction (if_c c e1 e2, memory) (e2, memory).
 
 Definition stuck { l d m } (v : tm l d m) (memory : mem l d m) :=
   not (is_value v) /\
       (forall v' memory',
-        not (reduction l d m (v, memory) (v', memory'))).
+        not (reduction (v, memory) (v', memory'))).
 
 Inductive gen_reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
 | gr_reduce : forall v memory v' memory',
-  reduction l d m (v, memory) (v', memory') ->
+  reduction (v, memory) (v', memory') ->
   gen_reduction (v, memory) (v', memory')
 | gr_stuck : forall v memory,
   stuck v memory ->
   gen_reduction (v, memory) (error, memory).
 
-Inductive step (l d m : nat) : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop :=
+Inductive step { l d m : nat } : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop :=
 | step_ctx : forall K e memory e' memory',
   gen_reduction (e, memory) (e', memory') ->
-  step l d m (Plug K e, memory) (Plug K e', memory').
+  step (Plug K e, memory) (Plug K e', memory').
 
 Lemma test_step :
-  forall memory,
-    step 0 0 0 ((zero (bitstring (bone (bone bend)))), memory) ((bitstring (bzero (bzero bend))), memory).
+  forall (memory : mem 0 0 0),
+    step ((zero (bitstring (bone (bone bend)))), memory) ((bitstring (bzero (bzero bend))), memory).
 Proof.
   intros.
+  Check zero (bitstring (bone (bone bend))).
   assert ((Plug (KHole 0 0 0) (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (step_ctx 0 0 0 (KHole 0 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
+  specialize (step_ctx (KHole 0 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
   specialize (gr_reduce (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hb.
-  specialize (r_zero 0 0 0 (bone (bone bend)) memory) as Hx.
+  specialize (r_zero (bone (bone bend)) memory) as Hx.
+  
   specialize (Hb Hx).
   specialize (Hn Hb).
   assumption.
 Qed.
 
 Lemma test_error :
-  forall memory,
-    step 0 0 0 (zero skip, memory) (error, memory).
+  forall (memory : mem 0 0 0),
+    step (zero skip, memory) (error, memory).
 Proof.
   intros.
   assert ((Plug (KHole 0 0 0) (zero skip)) = (zero skip)) as Hp. {
     simpl. reflexivity.
   }
   rewrite <- Hp.
-  specialize (step_ctx 0 0 0 (KHole 0 0 0) (zero skip) memory error memory) as Hb.
+  specialize (step_ctx (KHole 0 0 0) (zero skip) memory error memory) as Hb.
   specialize (gr_stuck (zero skip) memory) as Hx.
   assert (stuck (zero skip) memory) as Hs. {
     unfold stuck.
