@@ -6,49 +6,64 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
+Record Lattice := {
+  labels : Set;
+}.
+
+Record Ops := {
+  operations : Set;
+}.
+
 (* Testing out records *)
-Section FunnyWorld.
-
-  Record Lattice := {
-    labels : Set;
-  }.
-
-  Record Ops := {
-    operations : Set;
-  }.
+Section FooWorld.
 
   Variable L : Lattice.
 
-  Inductive funnytype : Type :=
-  | funnytm : L.(labels) -> funnytype.
+  Inductive footype : Type :=
+  | footm : L.(labels) -> footype.
 
-  Inductive evalfunny : funnytype -> nat -> Prop :=
-  | funnybasic : forall a,
-    evalfunny (funnytm a) 10.
+  Inductive evalfoo : footype -> nat -> Prop :=
+  | foobasic : forall a,
+    evalfoo (footm a) 10.
 
-End FunnyWorld.
+End FooWorld.
 
 (* Testing out using records and variables *)
-Inductive funnyset : Set :=
-| funny1
-| funny2
-| funny3.
+Inductive fooset : Set :=
+| foo1
+| bar1
+| baz1.
 
-Inductive funnyset2 : Set :=
-| funny4
-| funny5
-| funny6.
+Inductive fooset2 : Set :=
+| foo2
+| bar2
+| baz2.
 
-Definition funnyimpl : Lattice := {| labels := funnyset |}.
-Definition funnyimpl2 : Lattice := {| labels := funnyset2 |}.
+Definition fooimpl : Lattice := {| labels := fooset |}.
+Definition fooimpl2 : Lattice := {| labels := fooset2 |}.
 
 Lemma test_eval :
-  evalfunny funnyimpl (funnytm funnyimpl funny1) 10.
+  evalfoo fooimpl (footm fooimpl foo1) 10.
 Proof.
-  apply funnybasic.
+  constructor.
+Qed.
+
+Lemma test_eval2 :
+  evalfoo fooimpl2 (footm fooimpl2 foo2) 10.
+Proof.
+  constructor.
 Qed.
 
 (* End of testing, resume impl *)
+
+Section OwlWorld.
+
+Variable L : Lattice.
+
+(* l for label variables in scope *)
+(* d for type variables in scope  *)
+(* m for term variables in scope  *)
+
 
 Definition gamma_context (l : nat) (d : nat) (m : nat) := fin m -> ty l d.
 
@@ -231,21 +246,14 @@ Definition stuck { l d m } (v : tm l d m) (memory : mem l d m) :=
       (forall v' memory',
         not (reduction (v, memory) (v', memory'))).
 
-(* General logic reducing a term within a context, also allowing the error case to function *)
-Inductive gen_reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
-| gr_reduce : forall v memory v' memory',
-  reduction (v, memory) (v', memory') ->
-  gen_reduction (v, memory) (v', memory')
-| gr_stuck : forall v memory,
-  stuck v memory ->
-  gen_reduction (v, memory) (error, memory).
-
-
 (* General logic for evaluating a term down: create a context and evaluate it *)
 Inductive step { l d m : nat } : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop :=
 | step_ctx : forall K e memory e' memory',
-  gen_reduction (e, memory) (e', memory') ->
-  step (Plug K e, memory) (Plug K e', memory').
+  reduction (e, memory) (e', memory') ->
+  step (Plug K e, memory) (Plug K e', memory')
+| step_error : forall v memory,
+  stuck v memory ->
+  step (v, memory) (error, memory).
 
 Lemma test_step :
   forall (memory : mem 0 0 0),
@@ -258,11 +266,8 @@ Proof.
   }
   rewrite <- Ht.
   specialize (step_ctx (KHole 0 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
-  specialize (gr_reduce (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hb.
-  specialize (r_zero (bone (bone bend)) memory) as Hx.
-  
-  specialize (Hb Hx).
-  specialize (Hn Hb).
+  specialize (r_zero (bone (bone bend)) memory) as Hx. simpl in Hx.
+  specialize (Hn Hx).
   assumption.
 Qed.
 
@@ -271,12 +276,7 @@ Lemma test_error :
     step (zero skip, memory) (error, memory).
 Proof.
   intros.
-  assert ((Plug (KHole 0 0 0) (zero skip)) = (zero skip)) as Hp. {
-    simpl. reflexivity.
-  }
-  rewrite <- Hp.
-  specialize (step_ctx (KHole 0 0 0) (zero skip) memory error memory) as Hb.
-  specialize (gr_stuck (zero skip) memory) as Hx.
+  specialize (step_error (zero skip) memory) as Hx.
   assert (stuck (zero skip) memory) as Hs. {
     unfold stuck.
     split.
@@ -284,15 +284,10 @@ Proof.
     - intros. intro H. inversion H. 
   }
   specialize (Hx Hs).
-  specialize (Hb Hx).
-  simpl.
-  simpl in Hb.
   assumption.
 Qed.
-  
 
-
-(* Missing ST_VAR ST_DATA ST_LATUNIV *)
+(* Missing ST_VAR ST_DATA ST_LATUNIV And the other label defs... *)
 
 Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   ty l d -> ty l d -> Prop :=
@@ -322,3 +317,4 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   subtype Phi (lift_delta (scons t0 Delta)) t t' ->
   subtype Phi Delta (ex t0 t) (ex t0' t').
 
+End OwlWorld.
