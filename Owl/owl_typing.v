@@ -6,6 +6,50 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
+(* Testing out records *)
+Section FunnyWorld.
+
+  Record Lattice := {
+    labels : Set;
+  }.
+
+  Record Ops := {
+    operations : Set;
+  }.
+
+  Variable L : Lattice.
+
+  Inductive funnytype : Type :=
+  | funnytm : L.(labels) -> funnytype.
+
+  Inductive evalfunny : funnytype -> nat -> Prop :=
+  | funnybasic : forall a,
+    evalfunny (funnytm a) 10.
+
+End FunnyWorld.
+
+(* Testing out using records and variables *)
+Inductive funnyset : Set :=
+| funny1
+| funny2
+| funny3.
+
+Inductive funnyset2 : Set :=
+| funny4
+| funny5
+| funny6.
+
+Definition funnyimpl : Lattice := {| labels := funnyset |}.
+Definition funnyimpl2 : Lattice := {| labels := funnyset2 |}.
+
+Lemma test_eval :
+  evalfunny funnyimpl (funnytm funnyimpl funny1) 10.
+Proof.
+  apply funnybasic.
+Qed.
+
+(* End of testing, resume impl *)
+
 Definition gamma_context (l : nat) (d : nat) (m : nat) := fin m -> ty l d.
 
 Definition delta_context (l : nat) (d : nat) := fin d -> ty l d.
