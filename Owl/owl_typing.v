@@ -28,6 +28,8 @@ Section FooWorld.
 
 End FooWorld.
 
+Check evalfoo.
+
 (* Testing out using records and variables *)
 Inductive fooset : Set :=
 | foo1
