@@ -6,6 +6,9 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
+(* adversary is always the first variable in scope *)
+Definition adv : (label 1) := (var_label var_zero).
+
 Record Lattice := {
   labels : Set;
 }.
@@ -125,52 +128,52 @@ Inductive is_value { l d m } : tm l d m -> Prop :=
   is_value v ->
   is_value (pack v).
 
-Inductive Kctx (l d m : nat) :=
-| KHole : Kctx l d m
-| ZeroK : Kctx l d m -> Kctx l d m
-| KAppL : Kctx l d m -> tm l d m -> Kctx l d m
-| KAppR : forall (v : tm l d m), is_value v -> Kctx l d m -> Kctx l d m
-| KAlloc : Kctx l d m -> Kctx l d m
-| KDeAlloc : Kctx l d m -> Kctx l d m
-| KAssignL : Kctx l d m -> tm l d m -> Kctx l d m
-| KAssignR : forall (v : tm l d m), is_value v -> Kctx l d m -> Kctx l d m
-| KPairL : Kctx l d m -> tm l d m -> Kctx l d m
-| KPairR : forall (v : tm l d m), is_value v -> Kctx l d m -> Kctx l d m
-| KFst : Kctx l d m -> Kctx l d m
-| KSnd : Kctx l d m -> Kctx l d m
-| KInl : Kctx l d m -> Kctx l d m
-| KInR : Kctx l d m -> Kctx l d m
-| KCase : Kctx l d m -> tm l d (S m) -> tm l d (S m) -> Kctx l d m
-| KTapp : Kctx l d m -> ty l d -> Kctx l d m
-| KLapp : Kctx l d m -> label l -> Kctx l d m
-| KPack : Kctx l d m -> Kctx l d m
-| KUnpack : Kctx l d m -> tm l d (S m) -> Kctx l d m
-| KIf : Kctx l d m -> tm l d m -> tm l d m -> Kctx l d m
-| KSync : Kctx l d m -> Kctx l d m.
+Inductive Kctx {l d m : nat} :=
+| KHole : Kctx
+| ZeroK : Kctx -> Kctx
+| KAppL : Kctx -> tm l d m -> Kctx
+| KAppR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
+| KAlloc : Kctx -> Kctx
+| KDeAlloc : Kctx -> Kctx
+| KAssignL : Kctx -> tm l d m -> Kctx
+| KAssignR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
+| KPairL : Kctx -> tm l d m -> Kctx
+| KPairR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
+| KFst : Kctx -> Kctx
+| KSnd : Kctx -> Kctx
+| KInl : Kctx -> Kctx
+| KInR : Kctx -> Kctx
+| KCase : Kctx -> tm l d (S m) -> tm l d (S m) -> Kctx
+| KTapp : Kctx -> ty l d -> Kctx
+| KLapp : Kctx -> label l -> Kctx
+| KPack : Kctx -> Kctx
+| KUnpack : Kctx -> tm l d (S m) -> Kctx
+| KIf : Kctx -> tm l d m -> tm l d m -> Kctx
+| KSync : Kctx -> Kctx.
 
-Fixpoint Plug { l d m : nat } (K : Kctx l d m) (t : tm l d m) : (tm l d m) :=
+Fixpoint Plug (K : Kctx) (t : tm 1 0 0) : (tm 1 0 0) :=
    match K with
-   | KHole _ _ _ => t 
-   | ZeroK _ _ _ K' => zero (Plug K' t)
-   | KAppL _ _ _ K' e => (Core.app (Plug K' t) e)
-   | KAppR _ _ _ v _ K' => (Core.app v (Plug K' t))
-   | KAlloc _ _ _ K' => (alloc (Plug K' t))
-   | KDeAlloc _ _ _ K' => (dealloc (Plug K' t))
-   | KAssignL _ _ _ K' e => (assign (Plug K' t) e)
-   | KAssignR _ _ _ v _ K' => (assign v (Plug K' t))
-   | KPairL _ _ _ K' e => (tm_pair (Plug K' t) e)
-   | KPairR _ _ _ v _ K' => (tm_pair v (Plug K' t))
-   | KFst _ _ _ K' => (left_tm (Plug K' t))
-   | KSnd _ _ _ K' => (right_tm (Plug K' t))
-   | KInl _ _ _ K' => (inl (Plug K' t))
-   | KInR _ _ _ K' => (inr (Plug K' t))
-   | KCase _ _ _ K' e1 e2 => (case (Plug K' t) e1 e2)
-   | KTapp _ _ _ K' t' => (tapp (Plug K' t) t')
-   | KLapp _ _ _ K' l => (lapp (Plug K' t) l)
-   | KPack _ _ _ K' => (pack (Plug K' t))
-   | KUnpack _ _ _ K' e => (unpack (Plug K' t) e)
-   | KIf _ _ _ K' e1 e2 => (if_tm (Plug K' t) e1 e2)
-   | KSync _ _ _ K' => (sync (Plug K' t))
+   | KHole => t 
+   | ZeroK K' => zero (Plug K' t)
+   | KAppL K' e => (Core.app (Plug K' t) e)
+   | KAppR  v _ K' => (Core.app v (Plug K' t))
+   | KAlloc K' => (alloc (Plug K' t))
+   | KDeAlloc K' => (dealloc (Plug K' t))
+   | KAssignL K' e => (assign (Plug K' t) e)
+   | KAssignR  v _ K' => (assign v (Plug K' t))
+   | KPairL K' e => (tm_pair (Plug K' t) e)
+   | KPairR  v _ K' => (tm_pair v (Plug K' t))
+   | KFst K' => (left_tm (Plug K' t))
+   | KSnd K' => (right_tm (Plug K' t))
+   | KInl K' => (inl (Plug K' t))
+   | KInR  K' => (inr (Plug K' t))
+   | KCase K' e1 e2 => (case (Plug K' t) e1 e2)
+   | KTapp  K' t' => (tapp (Plug K' t) t')
+   | KLapp  K' l => (lapp (Plug K' t) l)
+   | KPack  K' => (pack (Plug K' t))
+   | KUnpack  K' e => (unpack (Plug K' t) e)
+   | KIf K' e1 e2 => (if_tm (Plug K' t) e1 e2)
+   | KSync K' => (sync (Plug K' t))
    end.
 
 Fixpoint generate_zero (b : binary) : binary :=
@@ -284,11 +287,11 @@ Lemma test_step :
 Proof.
   intros.
   Check zero (bitstring (bone (bone bend))).
-  assert ((Plug (KHole 1 0 0) (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
+  assert ((Plug KHole (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (step_ctx (KHole 1 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
+  specialize (step_ctx KHole (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
   specialize (r_zero (bone (bone bend)) memory) as Hx. simpl in Hx.
   specialize (Hn Hx).
   assumption.

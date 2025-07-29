@@ -25,7 +25,6 @@ nlt : cond_sym
 
 condition : cond_sym -> label -> label -> constr
 
-adv : label
 latl : Lcarrier -> label
 ljoin : label -> label -> label
 lmeet : label -> label -> label
