@@ -63,7 +63,7 @@ right_tm : tm -> tm
 inl : tm -> tm
 inr : tm -> tm
 case : tm -> (bind tm in tm) -> (bind tm in tm) -> tm
-tapp : tm -> ty -> tm
+tapp : tm -> tm
 lapp : tm -> label -> tm
 pack : tm -> tm
 unpack : tm -> (bind tm in tm) -> tm
