@@ -1,4 +1,4 @@
-Require Import core fintype.
+Require Import core fintype constants.
 
 Require Import Setoid Morphisms Relation_Definitions.
 
@@ -77,15 +77,24 @@ Proof.
 exact (eq_refl).
 Qed.
 
+Definition Lcarrier := L.(labels).
+
 Inductive label (n_label : nat) : Type :=
   | var_label : fin n_label -> label n_label
   | adv : label n_label
+  | latl : Lcarrier -> label n_label
   | ljoin : label n_label -> label n_label -> label n_label
   | lmeet : label n_label -> label n_label -> label n_label.
 
 Lemma congr_adv {m_label : nat} : adv m_label = adv m_label.
 Proof.
 exact (eq_refl).
+Qed.
+
+Lemma congr_latl {m_label : nat} {s0 : Lcarrier} {t0 : Lcarrier}
+  (H0 : s0 = t0) : latl m_label s0 = latl m_label t0.
+Proof.
+exact (eq_trans eq_refl (ap (fun x => latl m_label x) H0)).
 Qed.
 
 Lemma congr_ljoin {m_label : nat} {s0 : label m_label} {s1 : label m_label}
@@ -122,6 +131,7 @@ label n_label :=
   match s with
   | var_label _ s0 => var_label n_label (xi_label s0)
   | adv _ => adv n_label
+  | latl _ s0 => latl n_label s0
   | ljoin _ s0 s1 =>
       ljoin n_label (ren_label xi_label s0) (ren_label xi_label s1)
   | lmeet _ s0 s1 =>
@@ -148,6 +158,7 @@ label n_label :=
   match s with
   | var_label _ s0 => sigma_label s0
   | adv _ => adv n_label
+  | latl _ s0 => latl n_label s0
   | ljoin _ s0 s1 =>
       ljoin n_label (subst_label sigma_label s0) (subst_label sigma_label s1)
   | lmeet _ s0 s1 =>
@@ -182,6 +193,7 @@ Fixpoint idSubst_label {m_label : nat}
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (idSubst_label sigma_label Eq_label s0)
         (idSubst_label sigma_label Eq_label s1)
@@ -219,6 +231,7 @@ ren_label xi_label s = ren_label zeta_label s :=
   match s with
   | var_label _ s0 => ap (var_label n_label) (Eq_label s0)
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (extRen_label xi_label zeta_label Eq_label s0)
         (extRen_label xi_label zeta_label Eq_label s1)
@@ -257,6 +270,7 @@ Fixpoint ext_label {m_label : nat} {n_label : nat}
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (ext_label sigma_label tau_label Eq_label s0)
         (ext_label sigma_label tau_label Eq_label s1)
@@ -295,6 +309,7 @@ ren_label zeta_label (ren_label xi_label s) = ren_label rho_label s :=
   match s with
   | var_label _ s0 => ap (var_label l_label) (Eq_label s0)
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
         (compRenRen_label xi_label zeta_label rho_label Eq_label s0)
@@ -346,6 +361,7 @@ subst_label tau_label (ren_label xi_label s) = subst_label theta_label s :=
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
         (compRenSubst_label xi_label tau_label theta_label Eq_label s0)
@@ -419,6 +435,7 @@ ren_label zeta_label (subst_label sigma_label s) = subst_label theta_label s
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
         (compSubstRen_label sigma_label zeta_label theta_label Eq_label s0)
@@ -494,6 +511,7 @@ subst_label tau_label (subst_label sigma_label s) = subst_label theta_label s
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
         (compSubstSubst_label sigma_label tau_label theta_label Eq_label s0)
@@ -618,6 +636,7 @@ ren_label xi_label s = subst_label sigma_label s :=
   match s with
   | var_label _ s0 => Eq_label s0
   | adv _ => congr_adv
+  | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (rinst_inst_label xi_label sigma_label Eq_label s0)
         (rinst_inst_label xi_label sigma_label Eq_label s1)
@@ -2540,7 +2559,7 @@ Inductive tm (n_label n_ty n_tm : nat) : Type :=
   | bitstring : binary -> tm n_label n_ty n_tm
   | loc : nat -> tm n_label n_ty n_tm
   | fixlam : tm n_label n_ty (S (S n_tm)) -> tm n_label n_ty n_tm
-  | tlam : tm n_label (S n_ty) n_tm -> tm n_label n_ty n_tm
+  | tlam : tm n_label n_ty n_tm -> tm n_label n_ty n_tm
   | l_lam : tm (S n_label) n_ty n_tm -> tm n_label n_ty n_tm
   | op :
       tm n_label n_ty n_tm ->
@@ -2608,8 +2627,8 @@ Proof.
 exact (eq_trans eq_refl (ap (fun x => fixlam m_label m_ty m_tm x) H0)).
 Qed.
 
-Lemma congr_tlam {m_label m_ty m_tm : nat} {s0 : tm m_label (S m_ty) m_tm}
-  {t0 : tm m_label (S m_ty) m_tm} (H0 : s0 = t0) :
+Lemma congr_tlam {m_label m_ty m_tm : nat} {s0 : tm m_label m_ty m_tm}
+  {t0 : tm m_label m_ty m_tm} (H0 : s0 = t0) :
   tlam m_label m_ty m_tm s0 = tlam m_label m_ty m_tm t0.
 Proof.
 exact (eq_trans eq_refl (ap (fun x => tlam m_label m_ty m_tm x) H0)).
@@ -2871,10 +2890,7 @@ tm n_label n_ty n_tm :=
         (ren_tm (upRen_tm_label (upRen_tm_label xi_label))
            (upRen_tm_ty (upRen_tm_ty xi_ty))
            (upRen_tm_tm (upRen_tm_tm xi_tm)) s0)
-  | tlam _ _ _ s0 =>
-      tlam n_label n_ty n_tm
-        (ren_tm (upRen_ty_label xi_label) (upRen_ty_ty xi_ty)
-           (upRen_ty_tm xi_tm) s0)
+  | tlam _ _ _ s0 => tlam n_label n_ty n_tm (ren_tm xi_label xi_ty xi_tm s0)
   | l_lam _ _ _ s0 =>
       l_lam n_label n_ty n_tm
         (ren_tm (upRen_label_label xi_label) (upRen_label_ty xi_ty)
@@ -3010,9 +3026,7 @@ Fixpoint subst_tm {m_label m_ty m_tm : nat} {n_label n_ty n_tm : nat}
         (subst_tm (up_tm_label (up_tm_label sigma_label))
            (up_tm_ty (up_tm_ty sigma_ty)) (up_tm_tm (up_tm_tm sigma_tm)) s0)
   | tlam _ _ _ s0 =>
-      tlam n_label n_ty n_tm
-        (subst_tm (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) s0)
+      tlam n_label n_ty n_tm (subst_tm sigma_label sigma_ty sigma_tm s0)
   | l_lam _ _ _ s0 =>
       l_lam n_label n_ty n_tm
         (subst_tm (up_label_label sigma_label) (up_label_ty sigma_ty)
@@ -3181,9 +3195,7 @@ subst_tm sigma_label sigma_ty sigma_tm s = s :=
            (upId_tm_tm _ (upId_tm_tm _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (idSubst_tm (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) (upId_ty_label _ Eq_label)
-           (upId_ty_ty _ Eq_ty) (upId_ty_tm _ Eq_tm) s0)
+        (idSubst_tm sigma_label sigma_ty sigma_tm Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (idSubst_tm (up_label_label sigma_label) (up_label_ty sigma_ty)
@@ -3372,11 +3384,8 @@ ren_tm xi_label xi_ty xi_tm s = ren_tm zeta_label zeta_ty zeta_tm s :=
            (upExtRen_tm_tm _ _ (upExtRen_tm_tm _ _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (extRen_tm (upRen_ty_label xi_label) (upRen_ty_ty xi_ty)
-           (upRen_ty_tm xi_tm) (upRen_ty_label zeta_label)
-           (upRen_ty_ty zeta_ty) (upRen_ty_tm zeta_tm)
-           (upExtRen_ty_label _ _ Eq_label) (upExtRen_ty_ty _ _ Eq_ty)
-           (upExtRen_ty_tm _ _ Eq_tm) s0)
+        (extRen_tm xi_label xi_ty xi_tm zeta_label zeta_ty zeta_tm Eq_label
+           Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (extRen_tm (upRen_label_label xi_label) (upRen_label_ty xi_ty)
@@ -3611,10 +3620,8 @@ subst_tm sigma_label sigma_ty sigma_tm s = subst_tm tau_label tau_ty tau_tm s
            (upExt_tm_tm _ _ (upExt_tm_tm _ _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (ext_tm (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) (up_ty_label tau_label) (up_ty_ty tau_ty)
-           (up_ty_tm tau_tm) (upExt_ty_label _ _ Eq_label)
-           (upExt_ty_ty _ _ Eq_ty) (upExt_ty_tm _ _ Eq_tm) s0)
+        (ext_tm sigma_label sigma_ty sigma_tm tau_label tau_ty tau_tm
+           Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (ext_tm (up_label_label sigma_label) (up_label_ty sigma_ty)
@@ -3854,11 +3861,8 @@ ren_tm rho_label rho_ty rho_tm s :=
            (up_ren_ren _ _ _ (up_ren_ren _ _ _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (compRenRen_tm (upRen_ty_label xi_label) (upRen_ty_ty xi_ty)
-           (upRen_ty_tm xi_tm) (upRen_ty_label zeta_label)
-           (upRen_ty_ty zeta_ty) (upRen_ty_tm zeta_tm)
-           (upRen_ty_label rho_label) (upRen_ty_ty rho_ty)
-           (upRen_ty_tm rho_tm) Eq_label (up_ren_ren _ _ _ Eq_ty) Eq_tm s0)
+        (compRenRen_tm xi_label xi_ty xi_tm zeta_label zeta_ty zeta_tm
+           rho_label rho_ty rho_tm Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (compRenRen_tm (upRen_label_label xi_label) (upRen_label_ty xi_ty)
@@ -4129,12 +4133,8 @@ subst_tm theta_label theta_ty theta_tm s :=
            (up_ren_subst_tm_tm _ _ _ (up_ren_subst_tm_tm _ _ _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (compRenSubst_tm (upRen_ty_label xi_label) (upRen_ty_ty xi_ty)
-           (upRen_ty_tm xi_tm) (up_ty_label tau_label) (up_ty_ty tau_ty)
-           (up_ty_tm tau_tm) (up_ty_label theta_label) (up_ty_ty theta_ty)
-           (up_ty_tm theta_tm) (up_ren_subst_ty_label _ _ _ Eq_label)
-           (up_ren_subst_ty_ty _ _ _ Eq_ty) (up_ren_subst_ty_tm _ _ _ Eq_tm)
-           s0)
+        (compRenSubst_tm xi_label xi_ty xi_tm tau_label tau_ty tau_tm
+           theta_label theta_ty theta_tm Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (compRenSubst_tm (upRen_label_label xi_label) (upRen_label_ty xi_ty)
@@ -4580,13 +4580,8 @@ subst_tm theta_label theta_ty theta_tm s :=
            s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (compSubstRen_tm (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) (upRen_ty_label zeta_label)
-           (upRen_ty_ty zeta_ty) (upRen_ty_tm zeta_tm)
-           (up_ty_label theta_label) (up_ty_ty theta_ty) (up_ty_tm theta_tm)
-           (up_subst_ren_ty_label _ _ _ Eq_label)
-           (up_subst_ren_ty_ty _ _ _ _ Eq_ty)
-           (up_subst_ren_ty_tm _ _ _ _ _ Eq_tm) s0)
+        (compSubstRen_tm sigma_label sigma_ty sigma_tm zeta_label zeta_ty
+           zeta_tm theta_label theta_ty theta_tm Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (compSubstRen_tm (up_label_label sigma_label) (up_label_ty sigma_ty)
@@ -5061,12 +5056,8 @@ subst_tm theta_label theta_ty theta_tm s :=
            s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (compSubstSubst_tm (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) (up_ty_label tau_label) (up_ty_ty tau_ty)
-           (up_ty_tm tau_tm) (up_ty_label theta_label) (up_ty_ty theta_ty)
-           (up_ty_tm theta_tm) (up_subst_subst_ty_label _ _ _ Eq_label)
-           (up_subst_subst_ty_ty _ _ _ _ Eq_ty)
-           (up_subst_subst_ty_tm _ _ _ _ _ Eq_tm) s0)
+        (compSubstSubst_tm sigma_label sigma_ty sigma_tm tau_label tau_ty
+           tau_tm theta_label theta_ty theta_tm Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (compSubstSubst_tm (up_label_label sigma_label)
@@ -5461,10 +5452,8 @@ ren_tm xi_label xi_ty xi_tm s = subst_tm sigma_label sigma_ty sigma_tm s :=
            (rinstInst_up_tm_tm _ _ (rinstInst_up_tm_tm _ _ Eq_tm)) s0)
   | tlam _ _ _ s0 =>
       congr_tlam
-        (rinst_inst_tm (upRen_ty_label xi_label) (upRen_ty_ty xi_ty)
-           (upRen_ty_tm xi_tm) (up_ty_label sigma_label) (up_ty_ty sigma_ty)
-           (up_ty_tm sigma_tm) (rinstInst_up_ty_label _ _ Eq_label)
-           (rinstInst_up_ty_ty _ _ Eq_ty) (rinstInst_up_ty_tm _ _ Eq_tm) s0)
+        (rinst_inst_tm xi_label xi_ty xi_tm sigma_label sigma_ty sigma_tm
+           Eq_label Eq_ty Eq_tm s0)
   | l_lam _ _ _ s0 =>
       congr_l_lam
         (rinst_inst_tm (upRen_label_label xi_label) (upRen_label_ty xi_ty)
@@ -6271,6 +6260,8 @@ Arguments var_label {n_label}.
 Arguments lmeet {n_label}.
 
 Arguments ljoin {n_label}.
+
+Arguments latl {n_label}.
 
 Arguments adv {n_label}.
 

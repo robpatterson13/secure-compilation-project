@@ -1,5 +1,6 @@
 nat : Type
 list : Functor
+Lcarrier : Type
 
 label : Type
 constr : Type
@@ -25,6 +26,7 @@ nlt : cond_sym
 condition : cond_sym -> label -> label -> constr
 
 adv : label
+latl : Lcarrier -> label
 ljoin : label -> label -> label
 lmeet : label -> label -> label
 
@@ -45,7 +47,7 @@ skip : tm
 bitstring : binary -> tm
 loc : nat -> tm
 fixlam : (bind tm, tm in tm) -> tm
-tlam : (bind ty in tm) -> tm
+tlam : tm -> tm
 l_lam : (bind label in tm) -> tm
 
 op : tm -> "list" (tm) -> tm

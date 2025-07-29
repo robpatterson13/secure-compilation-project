@@ -1,4 +1,4 @@
-Require Import core fintype owl.
+Require Import core fintype owl constants.
 
 Require Import List. 
 Import ListNotations.
@@ -213,7 +213,7 @@ Axiom fresh_not_allocated :
   forall {l d m} (memory : mem l d m), memory (fresh memory) = None.
 
 (* General logic for non error reductions, and how they function *)
-Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop := 
+Inductive reduction : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop := 
 | r_zero : forall b memory, 
   reduction (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
 | r_ift : forall b e1 e2 memory, 
@@ -256,21 +256,21 @@ Inductive reduction {l d m : nat} : (tm l d m * mem l d m) -> (tm l d m * mem l 
 | r_unpack : forall v e memory,
   is_value v ->
   reduction (unpack (pack v) e, memory) (subst_tm var_label var_ty (scons v var_tm) e, memory)
-| r_iflt : forall c e1 e2 memory,
+| r_iflt : forall (c : constr 1) e1 e2 memory,
   valid_constraint c ->
   reduction (if_c c e1 e2, memory) (e1, memory)
-| r_iflf : forall c e1 e2 memory,
+| r_iflf : forall (c : constr 1) e1 e2 memory,
   not (valid_constraint c) ->
   reduction (if_c c e1 e2, memory) (e2, memory).
 
 (* To check if an evaluation is unable to continue/is malformed *)
-Definition stuck { l d m } (v : tm l d m) (memory : mem l d m) :=
+Definition stuck (v : tm 1 0 0) (memory : mem 1 0 0) :=
   not (is_value v) /\
       (forall v' memory',
         not (reduction (v, memory) (v', memory'))).
 
 (* General logic for evaluating a term down: create a context and evaluate it *)
-Inductive step { l d m : nat } : (tm l d m * mem l d m) -> (tm l d m * mem l d m) -> Prop :=
+Inductive step : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop :=
 | step_ctx : forall K e memory e' memory',
   reduction (e, memory) (e', memory') ->
   step (Plug K e, memory) (Plug K e', memory')
@@ -279,23 +279,23 @@ Inductive step { l d m : nat } : (tm l d m * mem l d m) -> (tm l d m * mem l d m
   step (v, memory) (error, memory).
 
 Lemma test_step :
-  forall (memory : mem 0 0 0),
+  forall (memory : mem 1 0 0),
     step ((zero (bitstring (bone (bone bend)))), memory) ((bitstring (bzero (bzero bend))), memory).
 Proof.
   intros.
   Check zero (bitstring (bone (bone bend))).
-  assert ((Plug (KHole 0 0 0) (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
+  assert ((Plug (KHole 1 0 0) (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (step_ctx (KHole 0 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
+  specialize (step_ctx (KHole 1 0 0) (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
   specialize (r_zero (bone (bone bend)) memory) as Hx. simpl in Hx.
   specialize (Hn Hx).
   assumption.
 Qed.
 
 Lemma test_error :
-  forall (memory : mem 0 0 0),
+  forall (memory : mem 1 0 0),
     step (zero skip, memory) (error, memory).
 Proof.
   intros.
