@@ -14,23 +14,6 @@ Record Ops := {
   operations : Set;
 }.
 
-(* Testing out records *)
-Section FooWorld.
-
-  Variable L : Lattice.
-
-  Inductive footype : Type :=
-  | footm : L.(labels) -> footype.
-
-  Inductive evalfoo : footype -> nat -> Prop :=
-  | foobasic : forall a,
-    evalfoo (footm a) 10.
-
-End FooWorld.
-
-Check evalfoo.
-
-(* Testing out using records and variables *)
 Inductive fooset : Set :=
 | foo1
 | bar1
@@ -43,6 +26,44 @@ Inductive fooset2 : Set :=
 
 Definition fooimpl : Lattice := {| labels := fooset |}.
 Definition fooimpl2 : Lattice := {| labels := fooset2 |}.
+
+Inductive test : forall L, L.(labels) -> Prop :=
+| tester : forall L a,
+  test L a.
+
+Lemma test_without_var :
+  test fooimpl foo1.
+Proof.
+constructor.
+Qed.
+
+(* Testing out records *)
+Section FooWorld.
+
+  Variable L : Lattice.
+
+  Inductive footype : Type :=
+  | footm : L.(labels) -> footype.
+
+  Inductive evalfoo : footype -> nat -> Prop :=
+  | foobasic : forall a,
+    evalfoo (footm a) 10.
+
+  Inductive test_sec : L.(labels) -> Prop :=
+  | tester_sec : forall a,
+    test_sec a.
+
+End FooWorld.
+
+Check evalfoo.
+
+(* Testing out using records and variables *)
+
+Lemma test_with_var :
+  test_sec fooimpl foo1.
+Proof.
+constructor.
+Qed.
 
 Lemma test_eval :
   evalfoo fooimpl (footm fooimpl foo1) 10.
