@@ -2,7 +2,6 @@ Require Import core fintype constants.
 
 Require Import Setoid Morphisms Relation_Definitions.
 
-
 Module Core.
 
 Inductive binary : Type :=

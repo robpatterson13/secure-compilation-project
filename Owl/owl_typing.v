@@ -9,14 +9,6 @@ From Coq Require Import Arith.Arith.
 (* adversary is always the first variable in scope *)
 Definition adv : (label 1) := (var_label var_zero).
 
-Record Lattice := {
-  labels : Set;
-}.
-
-Record Ops := {
-  operations : Set;
-}.
-
 Inductive fooset : Set :=
 | foo1
 | bar1
@@ -101,7 +93,7 @@ Definition lift_delta {l : nat} {d : nat} (Delta : fin (S d) -> ty l d)
   : delta_context l (S d)
   := fun i => ren_ty id shift (Delta i).
 
-Inductive is_value { l d m } : tm l d m -> Prop :=
+Inductive is_value { l m } : tm l m -> Prop :=
 | error_value : is_value error
 | skip_value : is_value skip
 | loc_value : forall n,
@@ -128,30 +120,30 @@ Inductive is_value { l d m } : tm l d m -> Prop :=
   is_value v ->
   is_value (pack v).
 
-Inductive Kctx {l d m : nat} :=
+Inductive Kctx {l m : nat} :=
 | KHole : Kctx
 | ZeroK : Kctx -> Kctx
-| KAppL : Kctx -> tm l d m -> Kctx
-| KAppR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
+| KAppL : Kctx -> tm l m -> Kctx
+| KAppR : forall (v : tm l m), is_value v -> Kctx -> Kctx
 | KAlloc : Kctx -> Kctx
 | KDeAlloc : Kctx -> Kctx
-| KAssignL : Kctx -> tm l d m -> Kctx
-| KAssignR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
-| KPairL : Kctx -> tm l d m -> Kctx
-| KPairR : forall (v : tm l d m), is_value v -> Kctx -> Kctx
+| KAssignL : Kctx -> tm l m -> Kctx
+| KAssignR : forall (v : tm l m), is_value v -> Kctx -> Kctx
+| KPairL : Kctx -> tm l m -> Kctx
+| KPairR : forall (v : tm l m), is_value v -> Kctx -> Kctx
 | KFst : Kctx -> Kctx
 | KSnd : Kctx -> Kctx
 | KInl : Kctx -> Kctx
 | KInR : Kctx -> Kctx
-| KCase : Kctx -> tm l d (S m) -> tm l d (S m) -> Kctx
-| KTapp : Kctx -> ty l d -> Kctx
+| KCase : Kctx -> tm l (S m) -> tm l (S m) -> Kctx
+| KTapp : Kctx -> Kctx
 | KLapp : Kctx -> label l -> Kctx
 | KPack : Kctx -> Kctx
-| KUnpack : Kctx -> tm l d (S m) -> Kctx
-| KIf : Kctx -> tm l d m -> tm l d m -> Kctx
+| KUnpack : Kctx -> tm l (S m) -> Kctx
+| KIf : Kctx -> tm l m -> tm l m -> Kctx
 | KSync : Kctx -> Kctx.
 
-Fixpoint Plug (K : Kctx) (t : tm 1 0 0) : (tm 1 0 0) :=
+Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    match K with
    | KHole => t 
    | ZeroK K' => zero (Plug K' t)
@@ -168,7 +160,7 @@ Fixpoint Plug (K : Kctx) (t : tm 1 0 0) : (tm 1 0 0) :=
    | KInl K' => (inl (Plug K' t))
    | KInR  K' => (inr (Plug K' t))
    | KCase K' e1 e2 => (case (Plug K' t) e1 e2)
-   | KTapp  K' t' => (tapp (Plug K' t) t')
+   | KTapp K' => (tapp (Plug K' t))
    | KLapp  K' l => (lapp (Plug K' t) l)
    | KPack  K' => (pack (Plug K' t))
    | KUnpack  K' e => (unpack (Plug K' t) e)
@@ -190,33 +182,33 @@ Fixpoint all_zero (b : binary) : Prop :=
   | bend => True 
   end.
 
-Definition mem (l d m : nat) := nat -> option (tm l d m).
+Definition mem (l m : nat) := nat -> option (tm l m).
 
-Definition only_values {l d m} (memory : mem l d m) : Prop :=
+Definition only_values {l m} (memory : mem l m) : Prop :=
   forall a t, memory a = Some t -> is_value t.
 
-Definition test_mem (l d m : nat) : mem l d m :=
+Definition test_mem (l m : nat) : mem l m :=
   fun i =>
     match i with 
     | 0 => Some (zero error)
     | (S _) => None
     end.
 
-Definition allocate {l d m} (location : nat) (v : tm l d m) (memory : mem l d m) : (mem l d m) :=
+Definition allocate {l m} (location : nat) (v : tm l m) (memory : mem l m) : (mem l m) :=
   fun i =>
     if (Nat.eq_dec i location)
     then Some v
     else memory i.
 
-Parameter fresh : forall {l d m}, mem l d m -> nat.
+Parameter fresh : forall {l m}, mem l m -> nat.
 
 Parameter valid_constraint : forall {l}, constr l -> Prop.
 
 Axiom fresh_not_allocated :
-  forall {l d m} (memory : mem l d m), memory (fresh memory) = None.
+  forall {l m} (memory : mem l m), memory (fresh memory) = None.
 
 (* General logic for non error reductions, and how they function *)
-Inductive reduction : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop := 
+Inductive reduction : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop := 
 | r_zero : forall b memory, 
   reduction (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
 | r_ift : forall b e1 e2 memory, 
@@ -237,7 +229,7 @@ Inductive reduction : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop :
   reduction (assign (loc n) v, memory) (skip, (allocate n v memory))
 | r_fix : forall e v memory,
   is_value v ->
-  reduction (Core.app (fixlam e) v, memory) ((subst_tm var_label var_ty (scons v (scons (fixlam e) var_tm)) e), memory)
+  reduction (Core.app (fixlam e) v, memory) ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory)
 | r_pair_l : forall v1 v2 memory,
   is_value v1 ->
   is_value v2 ->
@@ -248,32 +240,32 @@ Inductive reduction : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop :
   reduction (right_tm (tm_pair v1 v2), memory) (v2, memory)
 | r_case_l : forall v e1 e2 memory,
   is_value v ->
-  reduction (case (inl v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e1, memory)
+  reduction (case (inl v) e1 e2, memory) (subst_tm var_label(scons v var_tm) e1, memory)
 | r_case_r : forall v e1 e2 memory,
   is_value v ->
-  reduction (case (inr v) e1 e2, memory) (subst_tm var_label var_ty (scons v var_tm) e2, memory)
-| r_tapp : forall e t memory,
-  reduction (tapp (tlam e) t, memory) (subst_tm var_label (scons t var_ty) var_tm e, memory)
+  reduction (case (inr v) e1 e2, memory) (subst_tm var_label (scons v var_tm) e2, memory)
+| r_tapp : forall e memory,
+  reduction (tapp (tlam e), memory) (e, memory)
 | r_lapp : forall e lab memory,
-  reduction (lapp (l_lam e) lab, memory) ((subst_tm (scons lab var_label) var_ty var_tm e), memory)
+  reduction (lapp (l_lam e) lab, memory) ((subst_tm (scons lab var_label) var_tm e), memory)
 | r_unpack : forall v e memory,
   is_value v ->
-  reduction (unpack (pack v) e, memory) (subst_tm var_label var_ty (scons v var_tm) e, memory)
-| r_iflt : forall (c : constr 1) e1 e2 memory,
+  reduction (unpack (pack v) e, memory) (subst_tm var_label (scons v var_tm) e, memory)
+| r_iflt : forall c e1 e2 memory,
   valid_constraint c ->
   reduction (if_c c e1 e2, memory) (e1, memory)
-| r_iflf : forall (c : constr 1) e1 e2 memory,
+| r_iflf : forall c e1 e2 memory,
   not (valid_constraint c) ->
   reduction (if_c c e1 e2, memory) (e2, memory).
 
 (* To check if an evaluation is unable to continue/is malformed *)
-Definition stuck (v : tm 1 0 0) (memory : mem 1 0 0) :=
+Definition stuck (v : tm 0 0) (memory : mem 0 0) :=
   not (is_value v) /\
       (forall v' memory',
         not (reduction (v, memory) (v', memory'))).
 
 (* General logic for evaluating a term down: create a context and evaluate it *)
-Inductive step : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop :=
+Inductive step : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop :=
 | step_ctx : forall K e memory e' memory',
   reduction (e, memory) (e', memory') ->
   step (Plug K e, memory) (Plug K e', memory')
@@ -282,7 +274,7 @@ Inductive step : (tm 1 0 0 * mem 1 0 0) -> (tm 1 0 0 * mem 1 0 0) -> Prop :=
   step (v, memory) (error, memory).
 
 Lemma test_step :
-  forall (memory : mem 1 0 0),
+  forall (memory : mem 0 0),
     step ((zero (bitstring (bone (bone bend)))), memory) ((bitstring (bzero (bzero bend))), memory).
 Proof.
   intros.
@@ -298,7 +290,7 @@ Proof.
 Qed.
 
 Lemma test_error :
-  forall (memory : mem 1 0 0),
+  forall (memory : mem 0 0),
     step (zero skip, memory) (error, memory).
 Proof.
   intros.
