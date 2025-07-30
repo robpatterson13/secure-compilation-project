@@ -2,6 +2,7 @@ Require Import core fintype constants.
 
 Require Import Setoid Morphisms Relation_Definitions.
 
+
 Module Core.
 
 Inductive binary : Type :=
@@ -80,15 +81,9 @@ Definition Lcarrier := L.(labels).
 
 Inductive label (n_label : nat) : Type :=
   | var_label : fin n_label -> label n_label
-  | adv : label n_label
   | latl : Lcarrier -> label n_label
   | ljoin : label n_label -> label n_label -> label n_label
   | lmeet : label n_label -> label n_label -> label n_label.
-
-Lemma congr_adv {m_label : nat} : adv m_label = adv m_label.
-Proof.
-exact (eq_refl).
-Qed.
 
 Lemma congr_latl {m_label : nat} {s0 : Lcarrier} {t0 : Lcarrier}
   (H0 : s0 = t0) : latl m_label s0 = latl m_label t0.
@@ -129,7 +124,6 @@ Fixpoint ren_label {m_label : nat} {n_label : nat}
 label n_label :=
   match s with
   | var_label _ s0 => var_label n_label (xi_label s0)
-  | adv _ => adv n_label
   | latl _ s0 => latl n_label s0
   | ljoin _ s0 s1 =>
       ljoin n_label (ren_label xi_label s0) (ren_label xi_label s1)
@@ -156,7 +150,6 @@ Fixpoint subst_label {m_label : nat} {n_label : nat}
 label n_label :=
   match s with
   | var_label _ s0 => sigma_label s0
-  | adv _ => adv n_label
   | latl _ s0 => latl n_label s0
   | ljoin _ s0 s1 =>
       ljoin n_label (subst_label sigma_label s0) (subst_label sigma_label s1)
@@ -191,7 +184,6 @@ Fixpoint idSubst_label {m_label : nat}
 (s : label m_label) {struct s} : subst_label sigma_label s = s :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (idSubst_label sigma_label Eq_label s0)
@@ -225,11 +217,9 @@ Fixpoint extRen_label {m_label : nat} {n_label : nat}
 (xi_label : fin m_label -> fin n_label)
 (zeta_label : fin m_label -> fin n_label)
 (Eq_label : forall x, xi_label x = zeta_label x) (s : label m_label) {struct
- s} :
-ren_label xi_label s = ren_label zeta_label s :=
+ s} : ren_label xi_label s = ren_label zeta_label s :=
   match s with
   | var_label _ s0 => ap (var_label n_label) (Eq_label s0)
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (extRen_label xi_label zeta_label Eq_label s0)
@@ -268,7 +258,6 @@ Fixpoint ext_label {m_label : nat} {n_label : nat}
 {struct s} : subst_label sigma_label s = subst_label tau_label s :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (ext_label sigma_label tau_label Eq_label s0)
@@ -307,7 +296,6 @@ Fixpoint compRenRen_label {k_label : nat} {l_label : nat} {m_label : nat}
 ren_label zeta_label (ren_label xi_label s) = ren_label rho_label s :=
   match s with
   | var_label _ s0 => ap (var_label l_label) (Eq_label s0)
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
@@ -359,7 +347,6 @@ Fixpoint compRenSubst_label {k_label : nat} {l_label : nat} {m_label : nat}
 subst_label tau_label (ren_label xi_label s) = subst_label theta_label s :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
@@ -389,8 +376,7 @@ exact (fun n =>
                 (eq_sym
                    (compRenRen_label zeta_label shift
                       (funcomp shift zeta_label) (fun x => eq_refl)
-                      (sigma fin_n)))
-                (ap (ren_label shift) (Eq fin_n)))
+                      (sigma fin_n))) (ap (ren_label shift) (Eq fin_n)))
        | None => eq_refl
        end).
 Qed.
@@ -401,8 +387,7 @@ Lemma up_subst_ren_list_label_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (ren_label zeta_label) sigma x = theta x) :
   forall x,
   funcomp (ren_label (upRen_list_label_label p zeta_label))
-    (up_list_label_label p sigma) x =
-  up_list_label_label p theta x.
+    (up_list_label_label p sigma) x = up_list_label_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans (scons_p_comp' _ _ _ n)
@@ -418,8 +403,7 @@ exact (fun n =>
                   (eq_sym
                      (compRenRen_label zeta_label (shift_p p)
                         (funcomp (shift_p p) zeta_label) (fun x => eq_refl)
-                        (sigma n)))
-                  (ap (ren_label (shift_p p)) (Eq n)))))).
+                        (sigma n))) (ap (ren_label (shift_p p)) (Eq n)))))).
 Qed.
 
 Fixpoint compSubstRen_label {k_label : nat} {l_label : nat} {m_label : nat}
@@ -433,7 +417,6 @@ ren_label zeta_label (subst_label sigma_label s) = subst_label theta_label s
 :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
@@ -476,8 +459,7 @@ Lemma up_subst_subst_list_label_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (subst_label tau_label) sigma x = theta x) :
   forall x,
   funcomp (subst_label (up_list_label_label p tau_label))
-    (up_list_label_label p sigma) x =
-  up_list_label_label p theta x.
+    (up_list_label_label p sigma) x = up_list_label_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -509,7 +491,6 @@ subst_label tau_label (subst_label sigma_label s) = subst_label theta_label s
 :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin
@@ -634,7 +615,6 @@ Fixpoint rinst_inst_label {m_label : nat} {n_label : nat}
 ren_label xi_label s = subst_label sigma_label s :=
   match s with
   | var_label _ s0 => Eq_label s0
-  | adv _ => congr_adv
   | latl _ s0 => congr_latl (eq_refl s0)
   | ljoin _ s0 s1 =>
       congr_ljoin (rinst_inst_label xi_label sigma_label Eq_label s0)
@@ -1946,8 +1926,7 @@ ren_tm rho_label rho_tm s :=
            Eq_label Eq_tm s0)
         (list_comp
            (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
-              Eq_label Eq_tm)
-           s1)
+              Eq_label Eq_tm) s1)
   | zero _ _ s0 =>
       congr_zero
         (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
@@ -2163,8 +2142,7 @@ subst_tm theta_label theta_tm s :=
            Eq_label Eq_tm s0)
         (list_comp
            (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label
-              theta_tm Eq_label Eq_tm)
-           s1)
+              theta_tm Eq_label Eq_tm) s1)
   | zero _ _ s0 =>
       congr_zero
         (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label theta_tm
@@ -2275,8 +2253,7 @@ Lemma up_subst_ren_label_tm {k : nat} {l_label l_tm : nat}
   (Eq : forall x, funcomp (ren_tm zeta_label zeta_tm) sigma x = theta x) :
   forall x,
   funcomp (ren_tm (upRen_label_label zeta_label) (upRen_label_tm zeta_tm))
-    (up_label_tm sigma) x =
-  up_label_tm theta x.
+    (up_label_tm sigma) x = up_label_tm theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2307,8 +2284,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compRenRen_label zeta_label id (funcomp id zeta_label)
-                  (fun x => eq_refl) (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (fun x => eq_refl) (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_ren_tm_tm {k : nat} {l_label l_tm : nat} {m_label m_tm : nat}
@@ -2318,8 +2294,7 @@ Lemma up_subst_ren_tm_tm {k : nat} {l_label l_tm : nat} {m_label m_tm : nat}
   (Eq : forall x, funcomp (ren_tm zeta_label zeta_tm) sigma x = theta x) :
   forall x,
   funcomp (ren_tm (upRen_tm_label zeta_label) (upRen_tm_tm zeta_tm))
-    (up_tm_tm sigma) x =
-  up_tm_tm theta x.
+    (up_tm_tm sigma) x = up_tm_tm theta x.
 Proof.
 exact (fun n =>
        match n with
@@ -2347,8 +2322,7 @@ Lemma up_subst_ren_list_label_tm {p : nat} {k : nat} {l_label l_tm : nat}
   forall x,
   funcomp
     (ren_tm (upRen_list_label_label p zeta_label)
-       (upRen_list_label_tm p zeta_tm))
-    (up_list_label_tm p sigma) x =
+       (upRen_list_label_tm p zeta_tm)) (up_list_label_tm p sigma) x =
   up_list_label_tm p theta x.
 Proof.
 exact (fun n =>
@@ -2371,8 +2345,7 @@ Lemma up_subst_ren_list_tm_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (ren_label zeta_label) sigma x = theta x) :
   forall x,
   funcomp (ren_label (upRen_list_tm_label p zeta_label))
-    (up_list_tm_label p sigma) x =
-  up_list_tm_label p theta x.
+    (up_list_tm_label p sigma) x = up_list_tm_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2381,8 +2354,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compRenRen_label zeta_label id (funcomp id zeta_label)
-                  (fun x => eq_refl) (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (fun x => eq_refl) (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_ren_list_tm_tm {p : nat} {k : nat} {l_label l_tm : nat}
@@ -2393,8 +2365,7 @@ Lemma up_subst_ren_list_tm_tm {p : nat} {k : nat} {l_label l_tm : nat}
   forall x,
   funcomp
     (ren_tm (upRen_list_tm_label p zeta_label) (upRen_list_tm_tm p zeta_tm))
-    (up_list_tm_tm p sigma) x =
-  up_list_tm_tm p theta x.
+    (up_list_tm_tm p sigma) x = up_list_tm_tm p theta x.
 Proof.
 exact (fun n =>
        eq_trans (scons_p_comp' _ _ _ n)
@@ -2462,8 +2433,7 @@ subst_tm theta_label theta_tm s :=
            theta_tm Eq_label Eq_tm s0)
         (list_comp
            (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm
-              theta_label theta_tm Eq_label Eq_tm)
-           s1)
+              theta_label theta_tm Eq_label Eq_tm) s1)
   | zero _ _ s0 =>
       congr_zero
         (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm theta_label
@@ -2574,8 +2544,7 @@ Lemma up_subst_subst_label_tm {k : nat} {l_label l_tm : nat}
   (Eq : forall x, funcomp (subst_tm tau_label tau_tm) sigma x = theta x) :
   forall x,
   funcomp (subst_tm (up_label_label tau_label) (up_label_tm tau_tm))
-    (up_label_tm sigma) x =
-  up_label_tm theta x.
+    (up_label_tm sigma) x = up_label_tm theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2608,8 +2577,7 @@ exact (fun n =>
             (eq_sym
                (compSubstRen_label tau_label id
                   (funcomp (ren_label id) tau_label) (fun x => eq_refl)
-                  (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_subst_tm_tm {k : nat} {l_label l_tm : nat}
@@ -2619,8 +2587,7 @@ Lemma up_subst_subst_tm_tm {k : nat} {l_label l_tm : nat}
   (Eq : forall x, funcomp (subst_tm tau_label tau_tm) sigma x = theta x) :
   forall x,
   funcomp (subst_tm (up_tm_label tau_label) (up_tm_tm tau_tm))
-    (up_tm_tm sigma) x =
-  up_tm_tm theta x.
+    (up_tm_tm sigma) x = up_tm_tm theta x.
 Proof.
 exact (fun n =>
        match n with
@@ -2649,8 +2616,7 @@ Lemma up_subst_subst_list_label_tm {p : nat} {k : nat} {l_label l_tm : nat}
   forall x,
   funcomp
     (subst_tm (up_list_label_label p tau_label) (up_list_label_tm p tau_tm))
-    (up_list_label_tm p sigma) x =
-  up_list_label_tm p theta x.
+    (up_list_label_tm p sigma) x = up_list_label_tm p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2673,8 +2639,7 @@ Lemma up_subst_subst_list_tm_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (subst_label tau_label) sigma x = theta x) :
   forall x,
   funcomp (subst_label (up_list_tm_label p tau_label))
-    (up_list_tm_label p sigma) x =
-  up_list_tm_label p theta x.
+    (up_list_tm_label p sigma) x = up_list_tm_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2684,8 +2649,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compSubstRen_label tau_label id _ (fun x => eq_sym eq_refl)
-                  (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_subst_list_tm_tm {p : nat} {k : nat} {l_label l_tm : nat}
@@ -2695,8 +2659,7 @@ Lemma up_subst_subst_list_tm_tm {p : nat} {k : nat} {l_label l_tm : nat}
   (Eq : forall x, funcomp (subst_tm tau_label tau_tm) sigma x = theta x) :
   forall x,
   funcomp (subst_tm (up_list_tm_label p tau_label) (up_list_tm_tm p tau_tm))
-    (up_list_tm_tm p sigma) x =
-  up_list_tm_tm p theta x.
+    (up_list_tm_tm p sigma) x = up_list_tm_tm p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -2767,8 +2730,7 @@ subst_tm theta_label theta_tm s :=
            theta_tm Eq_label Eq_tm s0)
         (list_comp
            (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm
-              theta_label theta_tm Eq_label Eq_tm)
-           s1)
+              theta_label theta_tm Eq_label Eq_tm) s1)
   | zero _ _ s0 =>
       congr_zero
         (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm theta_label
@@ -4060,8 +4022,7 @@ Lemma up_subst_ren_label_ty {k : nat} {l_label l_ty : nat}
   (Eq : forall x, funcomp (ren_ty zeta_label zeta_ty) sigma x = theta x) :
   forall x,
   funcomp (ren_ty (upRen_label_label zeta_label) (upRen_label_ty zeta_ty))
-    (up_label_ty sigma) x =
-  up_label_ty theta x.
+    (up_label_ty sigma) x = up_label_ty theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -4092,8 +4053,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compRenRen_label zeta_label id (funcomp id zeta_label)
-                  (fun x => eq_refl) (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (fun x => eq_refl) (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_ren_ty_ty {k : nat} {l_label l_ty : nat} {m_label m_ty : nat}
@@ -4103,8 +4063,7 @@ Lemma up_subst_ren_ty_ty {k : nat} {l_label l_ty : nat} {m_label m_ty : nat}
   (Eq : forall x, funcomp (ren_ty zeta_label zeta_ty) sigma x = theta x) :
   forall x,
   funcomp (ren_ty (upRen_ty_label zeta_label) (upRen_ty_ty zeta_ty))
-    (up_ty_ty sigma) x =
-  up_ty_ty theta x.
+    (up_ty_ty sigma) x = up_ty_ty theta x.
 Proof.
 exact (fun n =>
        match n with
@@ -4132,8 +4091,7 @@ Lemma up_subst_ren_list_label_ty {p : nat} {k : nat} {l_label l_ty : nat}
   forall x,
   funcomp
     (ren_ty (upRen_list_label_label p zeta_label)
-       (upRen_list_label_ty p zeta_ty))
-    (up_list_label_ty p sigma) x =
+       (upRen_list_label_ty p zeta_ty)) (up_list_label_ty p sigma) x =
   up_list_label_ty p theta x.
 Proof.
 exact (fun n =>
@@ -4156,8 +4114,7 @@ Lemma up_subst_ren_list_ty_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (ren_label zeta_label) sigma x = theta x) :
   forall x,
   funcomp (ren_label (upRen_list_ty_label p zeta_label))
-    (up_list_ty_label p sigma) x =
-  up_list_ty_label p theta x.
+    (up_list_ty_label p sigma) x = up_list_ty_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -4166,8 +4123,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compRenRen_label zeta_label id (funcomp id zeta_label)
-                  (fun x => eq_refl) (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (fun x => eq_refl) (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_ren_list_ty_ty {p : nat} {k : nat} {l_label l_ty : nat}
@@ -4178,8 +4134,7 @@ Lemma up_subst_ren_list_ty_ty {p : nat} {k : nat} {l_label l_ty : nat}
   forall x,
   funcomp
     (ren_ty (upRen_list_ty_label p zeta_label) (upRen_list_ty_ty p zeta_ty))
-    (up_list_ty_ty p sigma) x =
-  up_list_ty_ty p theta x.
+    (up_list_ty_ty p sigma) x = up_list_ty_ty p theta x.
 Proof.
 exact (fun n =>
        eq_trans (scons_p_comp' _ _ _ n)
@@ -4284,8 +4239,7 @@ Lemma up_subst_subst_label_ty {k : nat} {l_label l_ty : nat}
   (Eq : forall x, funcomp (subst_ty tau_label tau_ty) sigma x = theta x) :
   forall x,
   funcomp (subst_ty (up_label_label tau_label) (up_label_ty tau_ty))
-    (up_label_ty sigma) x =
-  up_label_ty theta x.
+    (up_label_ty sigma) x = up_label_ty theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -4318,8 +4272,7 @@ exact (fun n =>
             (eq_sym
                (compSubstRen_label tau_label id
                   (funcomp (ren_label id) tau_label) (fun x => eq_refl)
-                  (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_subst_ty_ty {k : nat} {l_label l_ty : nat}
@@ -4329,8 +4282,7 @@ Lemma up_subst_subst_ty_ty {k : nat} {l_label l_ty : nat}
   (Eq : forall x, funcomp (subst_ty tau_label tau_ty) sigma x = theta x) :
   forall x,
   funcomp (subst_ty (up_ty_label tau_label) (up_ty_ty tau_ty))
-    (up_ty_ty sigma) x =
-  up_ty_ty theta x.
+    (up_ty_ty sigma) x = up_ty_ty theta x.
 Proof.
 exact (fun n =>
        match n with
@@ -4359,8 +4311,7 @@ Lemma up_subst_subst_list_label_ty {p : nat} {k : nat} {l_label l_ty : nat}
   forall x,
   funcomp
     (subst_ty (up_list_label_label p tau_label) (up_list_label_ty p tau_ty))
-    (up_list_label_ty p sigma) x =
-  up_list_label_ty p theta x.
+    (up_list_label_ty p sigma) x = up_list_label_ty p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -4383,8 +4334,7 @@ Lemma up_subst_subst_list_ty_label {p : nat} {k : nat} {l_label : nat}
   (Eq : forall x, funcomp (subst_label tau_label) sigma x = theta x) :
   forall x,
   funcomp (subst_label (up_list_ty_label p tau_label))
-    (up_list_ty_label p sigma) x =
-  up_list_ty_label p theta x.
+    (up_list_ty_label p sigma) x = up_list_ty_label p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -4394,8 +4344,7 @@ exact (fun n =>
          (eq_trans
             (eq_sym
                (compSubstRen_label tau_label id _ (fun x => eq_sym eq_refl)
-                  (sigma n)))
-            (ap (ren_label id) (Eq n)))).
+                  (sigma n))) (ap (ren_label id) (Eq n)))).
 Qed.
 
 Lemma up_subst_subst_list_ty_ty {p : nat} {k : nat} {l_label l_ty : nat}
@@ -4405,8 +4354,7 @@ Lemma up_subst_subst_list_ty_ty {p : nat} {k : nat} {l_label l_ty : nat}
   (Eq : forall x, funcomp (subst_ty tau_label tau_ty) sigma x = theta x) :
   forall x,
   funcomp (subst_ty (up_list_ty_label p tau_label) (up_list_ty_ty p tau_ty))
-    (up_list_ty_ty p sigma) x =
-  up_list_ty_ty p theta x.
+    (up_list_ty_ty p sigma) x = up_list_ty_ty p theta x.
 Proof.
 exact (fun n =>
        eq_trans
@@ -5259,8 +5207,8 @@ Ltac asimpl := check_no_evars;
                   Up_tm_tm, Up_tm, up_tm, Subst_tm, Subst2, subst2,
                   VarInstance_ty, Var, ids, Ren_ty, Ren2, ren2, Up_label_ty,
                   Up_ty, up_ty, Up_ty_label, Up_label, up_label, Up_ty_ty,
-                  Up_ty, up_ty, Subst_ty, Subst2, subst2 in *;
-                asimpl'; minimize.
+                  Up_ty, up_ty, Subst_ty, Subst2, subst2 in *; asimpl';
+                minimize.
 
 Tactic Notation "asimpl" "in" hyp(J) := revert J; asimpl; intros J.
 
@@ -5378,8 +5326,6 @@ Arguments lmeet {n_label}.
 Arguments ljoin {n_label}.
 
 Arguments latl {n_label}.
-
-Arguments adv {n_label}.
 
 #[global] Hint Opaque subst_ty: rewrite.
 

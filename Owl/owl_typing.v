@@ -6,82 +6,12 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
-(* adversary is always the first variable in scope *)
-Definition adv : (label 1) := (var_label var_zero).
-
-Inductive fooset : Set :=
-| foo1
-| bar1
-| baz1.
-
-Inductive fooset2 : Set :=
-| foo2
-| bar2
-| baz2.
-
-Definition fooimpl : Lattice := {| labels := fooset |}.
-Definition fooimpl2 : Lattice := {| labels := fooset2 |}.
-
-Inductive test : forall L, L.(labels) -> Prop :=
-| tester : forall L a,
-  test L a.
-
-Lemma test_without_var :
-  test fooimpl foo1.
-Proof.
-constructor.
-Qed.
-
-(* Testing out records *)
-Section FooWorld.
-
-  Variable L : Lattice.
-
-  Inductive footype : Type :=
-  | footm : L.(labels) -> footype.
-
-  Inductive evalfoo : footype -> nat -> Prop :=
-  | foobasic : forall a,
-    evalfoo (footm a) 10.
-
-  Inductive test_sec : L.(labels) -> Prop :=
-  | tester_sec : forall a,
-    test_sec a.
-
-End FooWorld.
-
-Check evalfoo.
-
-(* Testing out using records and variables *)
-
-Lemma test_with_var :
-  test_sec fooimpl foo1.
-Proof.
-constructor.
-Qed.
-
-Lemma test_eval :
-  evalfoo fooimpl (footm fooimpl foo1) 10.
-Proof.
-  constructor.
-Qed.
-
-Lemma test_eval2 :
-  evalfoo fooimpl2 (footm fooimpl2 foo2) 10.
-Proof.
-  constructor.
-Qed.
-
-(* End of testing, resume impl *)
-
-Section OwlWorld.
-
-Variable L : Lattice.
-
 (* l for label variables in scope *)
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
 
+(* adversary is always the first variable in scope *)
+Definition adv : (label 1) := (var_label var_zero).
 
 Definition gamma_context (l : nat) (d : nat) (m : nat) := fin m -> ty l d.
 
@@ -202,10 +132,43 @@ Definition allocate {l m} (location : nat) (v : tm l m) (memory : mem l m) : (me
 
 Parameter fresh : forall {l m}, mem l m -> nat.
 
-Parameter valid_constraint : forall {l}, constr l -> Prop.
-
 Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
+
+(* Convert from labels down to lattice elements *)
+Fixpoint interp_lattice (l : label 0) : L.(labels) :=
+  match l with 
+  | latl x => x
+  | ljoin x y => (L.(join) (interp_lattice x) (interp_lattice y)) 
+  | lmeet x y => (L.(meet) (interp_lattice x) (interp_lattice y)) 
+  | var_label n => match n with end
+  end.
+
+(* Simple Negation method *)
+Definition negate_cond {l} (co : constr l) : constr l :=
+  match co with
+  | (condition Core.leq x y) => (condition nleq x y)
+  | (condition geq x y) => (condition ngeq x y)
+  | (condition gt x y) => (condition ngt x y)
+  | (condition lt x y) => (condition nlt x y)
+  | (condition nleq x y) => (condition Core.leq x y)
+  | (condition ngeq x y) => (condition geq x y)
+  | (condition ngt x y) => (condition gt x y)
+  | (condition nlt x y) => (condition lt x y)
+  end.  
+
+(* Check if a constraint is valid, under the assumption it is closed *)
+Definition valid_constraint (co : constr 0) : Prop :=
+  match co with
+  | (condition Core.leq x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true
+  | (condition geq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true
+  | (condition gt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true /\ L.(leq) (interp_lattice x) (interp_lattice y) = false
+  | (condition lt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true /\ L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition nleq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition ngeq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition ngt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false \/ L.(leq) (interp_lattice x) (interp_lattice y) = true
+  | (condition nlt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = false \/ L.(leq) (interp_lattice y) (interp_lattice x) = false
+  end.
 
 (* General logic for non error reductions, and how they function *)
 Inductive reduction : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop := 
@@ -305,6 +268,8 @@ Proof.
   assumption.
 Qed.
 
+(* Complete subtyping next, minus the material about ops... probablity later *)
+
 (* Missing ST_VAR ST_DATA ST_LATUNIV And the other label defs... *)
 
 Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
@@ -334,5 +299,3 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   subtype Phi Delta t0 t0' ->
   subtype Phi (lift_delta (scons t0 Delta)) t t' ->
   subtype Phi Delta (ex t0 t) (ex t0' t').
-
-End OwlWorld.
