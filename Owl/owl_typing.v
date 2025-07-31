@@ -19,9 +19,76 @@ Definition delta_context (l : nat) (d : nat) := fin d -> ty l d.
 
 Definition phi_context (l : nat) := (list (constr l)).
 
+Definition empty_gamma {l d} : gamma_context l d 0 :=
+  fun (i : fin 0) => match i with end.
+
+Definition empty_delta {l} : delta_context l 0 :=
+  fun (i : fin 0) => match i with end.
+
+Definition empty_phi {l} : (phi_context l) := [].
+
 Definition lift_delta {l : nat} {d : nat} (Delta : fin (S d) -> ty l d)
   : delta_context l (S d)
   := fun i => ren_ty id shift (Delta i).
+
+(* Convert from labels down to lattice elements *)
+Fixpoint interp_lattice (l : label 0) : L.(labels) :=
+  match l with 
+  | latl x => x
+  | ljoin x y => (L.(join) (interp_lattice x) (interp_lattice y)) 
+  | lmeet x y => (L.(meet) (interp_lattice x) (interp_lattice y)) 
+  | var_label n => match n with end
+  end.
+
+(* Simple Negation method *)
+Definition negate_cond {l} (co : constr l) : constr l :=
+  match co with
+  | (condition Core.leq x y) => (condition nleq x y)
+  | (condition geq x y) => (condition ngeq x y)
+  | (condition gt x y) => (condition ngt x y)
+  | (condition lt x y) => (condition nlt x y)
+  | (condition nleq x y) => (condition Core.leq x y)
+  | (condition ngeq x y) => (condition geq x y)
+  | (condition ngt x y) => (condition gt x y)
+  | (condition nlt x y) => (condition lt x y)
+  end.  
+
+(* Check if a constraint is valid, under the assumption it is closed *)
+Definition valid_constraint (co : constr 0) : Prop :=
+  match co with
+  | (condition Core.leq x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true
+  | (condition geq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true
+  | (condition gt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true /\ L.(leq) (interp_lattice x) (interp_lattice y) = false
+  | (condition lt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true /\ L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition nleq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition ngeq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
+  | (condition ngt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false \/ L.(leq) (interp_lattice x) (interp_lattice y) = true
+  | (condition nlt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = false \/ L.(leq) (interp_lattice y) (interp_lattice x) = false
+  end.
+
+Definition phi_map (l : nat) : Type := (fin l) -> (label 0).
+
+Definition phi_map_holds (l : nat) (pm : phi_map l) (co : constr l) : Prop := 
+  match co with
+  | (condition c l1 l2) => (valid_constraint (condition c (subst_label pm l1) (subst_label pm l2)))
+  end.
+
+Definition lift_phi {l} (pm : phi_context l) : phi_context (S l) :=
+  map (ren_constr shift) pm.
+
+Inductive valid_phi_map : forall l, phi_map l -> phi_context l -> Prop :=
+| phi_empty_valid : forall (pm : phi_map 1),
+  valid_phi_map 1 pm empty_phi 
+| phi_constraint_valid : forall l pm phictx c,
+  valid_phi_map l pm phictx ->
+  phi_map_holds l pm c ->
+  valid_phi_map l pm (c :: phictx)
+| phi_var_holds : forall l lab pm phictx,
+  valid_phi_map l pm phictx ->
+  valid_phi_map (S l) (scons lab pm) (lift_phi phictx).
+
+
+Definition phi_entails_c :
 
 Inductive is_value { l m } : tm l m -> Prop :=
 | error_value : is_value error
@@ -134,41 +201,6 @@ Parameter fresh : forall {l m}, mem l m -> nat.
 
 Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
-
-(* Convert from labels down to lattice elements *)
-Fixpoint interp_lattice (l : label 0) : L.(labels) :=
-  match l with 
-  | latl x => x
-  | ljoin x y => (L.(join) (interp_lattice x) (interp_lattice y)) 
-  | lmeet x y => (L.(meet) (interp_lattice x) (interp_lattice y)) 
-  | var_label n => match n with end
-  end.
-
-(* Simple Negation method *)
-Definition negate_cond {l} (co : constr l) : constr l :=
-  match co with
-  | (condition Core.leq x y) => (condition nleq x y)
-  | (condition geq x y) => (condition ngeq x y)
-  | (condition gt x y) => (condition ngt x y)
-  | (condition lt x y) => (condition nlt x y)
-  | (condition nleq x y) => (condition Core.leq x y)
-  | (condition ngeq x y) => (condition geq x y)
-  | (condition ngt x y) => (condition gt x y)
-  | (condition nlt x y) => (condition lt x y)
-  end.  
-
-(* Check if a constraint is valid, under the assumption it is closed *)
-Definition valid_constraint (co : constr 0) : Prop :=
-  match co with
-  | (condition Core.leq x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true
-  | (condition geq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true
-  | (condition gt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = true /\ L.(leq) (interp_lattice x) (interp_lattice y) = false
-  | (condition lt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = true /\ L.(leq) (interp_lattice y) (interp_lattice x) = false
-  | (condition nleq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
-  | (condition ngeq x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false
-  | (condition ngt x y) => L.(leq) (interp_lattice y) (interp_lattice x) = false \/ L.(leq) (interp_lattice x) (interp_lattice y) = true
-  | (condition nlt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = false \/ L.(leq) (interp_lattice y) (interp_lattice x) = false
-  end.
 
 (* General logic for non error reductions, and how they function *)
 Inductive reduction : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop := 
