@@ -31,6 +31,19 @@ Definition lift_delta {l : nat} {d : nat} (Delta : fin (S d) -> ty l d)
   : delta_context l (S d)
   := fun i => ren_ty id shift (Delta i).
 
+Definition lift_delta_l {l : nat} {d : nat} (Delta : delta_context l d)
+  : delta_context (S l) d
+  := fun i => ren_ty shift id (Delta i).
+
+Definition lift_gamma {l d m} (Gamma : gamma_context l d m)
+  : gamma_context l (S d) m
+  := fun i => ren_ty id shift (Gamma i).
+
+Definition lift_gamma_l {l d m} (Gamma : gamma_context l d m)
+  : gamma_context (S l) d m
+  := fun i => ren_ty shift id (Gamma i).
+
+
 (* Convert from labels down to lattice elements *)
 Fixpoint interp_lattice (l : label 0) : L.(labels) :=
   match l with 
@@ -87,9 +100,18 @@ Inductive valid_phi_map : forall l, phi_map l -> phi_context l -> Prop :=
   valid_phi_map l pm phictx ->
   valid_phi_map (S l) (scons lab pm) (lift_phi phictx).
 
+Definition phi_entails_c {l} (pctx : phi_context l) (co : constr l) : Prop :=
+  (forall pm,
+    valid_phi_map l pm pctx ->
+    phi_map_holds l pm co).
 
-Definition phi_entails_c :
+Notation "pctx |= co" := (phi_entails_c pctx co)
+  (at level 100, right associativity).
 
+Notation "! e" := (dealloc e)
+  (at level 100, right associativity).
+
+(* Checks for proper values within terms *)
 Inductive is_value { l m } : tm l m -> Prop :=
 | error_value : is_value error
 | skip_value : is_value skip
@@ -117,6 +139,7 @@ Inductive is_value { l m } : tm l m -> Prop :=
   is_value v ->
   is_value (pack v).
 
+(* K context (continuance) for evaluation rules *)
 Inductive Kctx {l m : nat} :=
 | KHole : Kctx
 | ZeroK : Kctx -> Kctx
@@ -140,6 +163,7 @@ Inductive Kctx {l m : nat} :=
 | KIf : Kctx -> tm l m -> tm l m -> Kctx
 | KSync : Kctx -> Kctx.
 
+(* Plug a term into the expression context K to get a resulting term *)
 Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    match K with
    | KHole => t 
@@ -165,6 +189,7 @@ Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    | KSync K' => (sync (Plug K' t))
    end.
 
+(* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
   match b with
   | (bone b') => (bzero (generate_zero b'))
@@ -172,6 +197,7 @@ Fixpoint generate_zero (b : binary) : binary :=
   | bend => bend 
   end.
 
+(* check if a bitstring is all 0s *)
 Fixpoint all_zero (b : binary) : Prop :=
   match b with
   | (bone b') => False
@@ -181,6 +207,7 @@ Fixpoint all_zero (b : binary) : Prop :=
 
 Definition mem (l m : nat) := nat -> option (tm l m).
 
+(* Memory only contains value terms *)
 Definition only_values {l m} (memory : mem l m) : Prop :=
   forall a t, memory a = Some t -> is_value t.
 
@@ -191,6 +218,7 @@ Definition test_mem (l m : nat) : mem l m :=
     | (S _) => None
     end.
 
+(* Allocate a new area of memory at a specified location *)
 Definition allocate {l m} (location : nat) (v : tm l m) (memory : mem l m) : (mem l m) :=
   fun i =>
     if (Nat.eq_dec i location)
@@ -259,7 +287,7 @@ Definition stuck (v : tm 0 0) (memory : mem 0 0) :=
       (forall v' memory',
         not (reduction (v, memory) (v', memory'))).
 
-(* General logic for evaluating a term down: create a context and evaluate it *)
+(* General logic for evaluating a term down: create a context and evaluate it or reduce to error *)
 Inductive step : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop :=
 | step_ctx : forall K e memory e' memory',
   reduction (e, memory) (e', memory') ->
@@ -302,13 +330,15 @@ Qed.
 
 (* Complete subtyping next, minus the material about ops... probablity later *)
 
-(* Missing ST_VAR ST_DATA ST_LATUNIV And the other label defs... *)
-
+(* subtyping rules for Owl *)
 Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   ty l d -> ty l d -> Prop :=
 | ST_Any : forall t,
   subtype Phi Delta t Any
 | ST_Unit : subtype Phi Delta Unit Unit
+| ST_Data : forall lab lab',
+  (Phi |= (condition Core.leq lab lab')) ->
+  subtype Phi Delta (Data lab) (Data lab')
 | ST_Func : forall t1' t1 t2 t2',
   subtype Phi Delta t1' t1 ->
   subtype Phi Delta t2 t2' ->
@@ -330,4 +360,118 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
 | ST_Exist : forall t0 t0' t t',
   subtype Phi Delta t0 t0' ->
   subtype Phi (lift_delta (scons t0 Delta)) t t' ->
-  subtype Phi Delta (ex t0 t) (ex t0' t').
+  subtype Phi Delta (ex t0 t) (ex t0' t')
+| ST_LatUniv : forall cs (lab : label l) (lab' : label l) t t',
+  (((condition cs (var_label var_zero) (ren_label shift lab)) :: (lift_phi Phi)) 
+  |= (condition cs (var_label var_zero) (ren_label shift lab'))) ->
+  subtype ((condition cs (var_label var_zero) (ren_label shift lab)) :: (lift_phi Phi)) (lift_delta_l Delta) t t' ->
+  subtype Phi Delta (all_l cs lab t) (all_l cs lab' t')
+| ST_IfElimL : forall co t1 t2 t1',
+  (Phi |= co) -> 
+  subtype Phi Delta t1 t1' ->
+  subtype Phi Delta (t_if co t1 t2) t1'
+| ST_IfElimR : forall co t1 t2 t2',
+  (Phi |= (negate_cond co)) -> 
+  subtype Phi Delta t2 t2' ->
+  subtype Phi Delta (t_if co t1 t2) t2'
+| ST_IfIntroL : forall co t1 t1' t2',
+  (Phi |= co) ->
+  subtype Phi Delta t1 t1' ->
+  subtype Phi Delta t1 (t_if co t1' t2')
+| ST_IfIntroR : forall co t2 t1' t2',
+  (Phi |= (negate_cond co)) ->
+  subtype Phi Delta t2 t2' ->
+  subtype Phi Delta t2 (t_if co t1' t2')
+| ST_Lem : forall co t t',
+  subtype (co :: Phi) Delta t t' ->
+  subtype ((negate_cond co) :: Phi) Delta t t' ->
+  subtype Phi Delta t t'.
+
+(* Typing rules for Owl *)
+Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l d) (Gamma : gamma_context l d m) :
+  tm l m -> ty l d -> Prop :=
+| T_Var : forall x,
+  has_type Phi Delta Gamma (var_tm x) (Gamma x)
+| T_IUnit : has_type Phi Delta Gamma skip Unit
+| T_Const : forall b,
+  has_type Phi Delta Gamma (bitstring b) (Data (latl L.(bot)))
+| T_Zero : forall e l,
+  has_type Phi Delta Gamma e (Data l) ->
+  has_type Phi Delta Gamma (zero e) (Data (latl (L.(bot))))
+| T_If : forall e e1 e2 t,
+  has_type Phi Delta Gamma e (Data (latl L.(bot))) ->
+  has_type Phi Delta Gamma e1 t ->
+  has_type Phi Delta Gamma e2 t ->
+  has_type Phi Delta Gamma (if_tm e e1 e2) t
+| T_IRef : forall e t,
+  has_type Phi Delta Gamma e t ->
+  has_type Phi Delta Gamma (alloc e) (Ref t)
+| T_ERef : forall e t,
+  has_type Phi Delta Gamma e (Ref t) ->
+  has_type Phi Delta Gamma (! e) t
+| T_Assign : forall e1 e2 t,
+  has_type Phi Delta Gamma e1 (Ref t) ->
+  has_type Phi Delta Gamma e2 t ->
+  has_type Phi Delta Gamma (assign e1 e2) Unit
+| T_IFun : forall e t t',
+  has_type Phi Delta (scons (arr t t') (scons t Gamma)) e t ->
+  has_type Phi Delta Gamma (fixlam e) (arr t t')
+| T_EFun : forall e1 e2 t t',
+  has_type Phi Delta Gamma e1 (arr t t') ->
+  has_type Phi Delta Gamma e2 t ->
+  has_type Phi Delta Gamma (Core.app e1 e2) t
+| T_IProd : forall e1 e2 t1 t2,
+  has_type Phi Delta Gamma e1 t1 ->
+  has_type Phi Delta Gamma e2 t2 ->
+  has_type Phi Delta Gamma (tm_pair e1 e2) (prod t1 t2)
+| T_EProdL : forall e t1 t2,
+  has_type Phi Delta Gamma e (prod t1 t2) ->
+  has_type Phi Delta Gamma (left_tm e) t1
+| T_EProdR : forall e t1 t2,
+  has_type Phi Delta Gamma e (prod t1 t2) ->
+  has_type Phi Delta Gamma (right_tm e) t2
+| T_ISumL : forall e t1 t2,
+  has_type Phi Delta Gamma e t1 ->
+  has_type Phi Delta Gamma (inl e) (sum t1 t2)
+| T_ISumR : forall e t1 t2,
+  has_type Phi Delta Gamma e t2 ->
+  has_type Phi Delta Gamma (inr e) (sum t1 t2)
+| T_ESum : forall e t1 t2 t e1 e2,
+  has_type Phi Delta Gamma e (sum t1 t2) ->
+  has_type Phi Delta (scons t1 Gamma) e1 t ->
+  has_type Phi Delta (scons t2 Gamma) e2 t ->
+  has_type Phi Delta Gamma (case e e1 e2) t
+| T_IUniv : forall t0 t e,
+  has_type Phi (lift_delta (scons t0 Delta)) (lift_gamma Gamma) e t ->
+  has_type Phi Delta Gamma (tlam e) (all t0 t)
+| T_EUniv : forall t t' t0 e,
+ subtype Phi Delta t' t0 ->
+ has_type Phi Delta Gamma e (all t0 t) ->
+ has_type Phi Delta Gamma (tapp e) (subst_ty var_label (scons t' var_ty) t)
+| T_IExist : forall e t t' t0,
+  has_type Phi Delta Gamma e (subst_ty var_label (scons t' var_ty) t) ->
+  subtype Phi Delta t' t0 ->
+  has_type Phi Delta Gamma (pack e) (ex t0 t)
+| T_EExist : forall e e' t0 t t',
+  has_type Phi Delta Gamma e (all t0 t) ->
+  has_type Phi (lift_delta (scons t0 Delta)) (scons t (lift_gamma Gamma)) e' (ren_ty id shift t') ->
+  has_type Phi Delta Gamma (unpack e e') t'
+| T_ILUniv : forall cs lab e t,
+  has_type ((condition cs (var_label var_zero) (ren_label shift lab)) :: (lift_phi Phi)) 
+                                        (lift_delta_l Delta) (lift_gamma_l Gamma) e t ->
+  has_type Phi Delta Gamma (l_lam e) (all_l cs lab t)
+| T_ELUniv : forall cs lab lab' e t,
+  (Phi |= (condition cs lab lab')) ->
+  has_type Phi Delta Gamma e (all_l cs lab t) ->
+  has_type Phi Delta Gamma (lapp e lab') (subst_ty (scons lab' var_label) var_ty t)
+| T_Lem : forall co e t,
+  has_type (co :: Phi) Delta Gamma e t ->
+  has_type ((negate_cond co) :: Phi) Delta Gamma e t ->
+  has_type Phi Delta Gamma e t
+| T_LIf : forall co e1 e2 t,
+  has_type (co :: Phi) Delta Gamma e1 t ->
+  has_type (co :: Phi) Delta Gamma e2 t ->
+  has_type Phi Delta Gamma (if_c co e1 e2) t
+| T_Sync : forall e,
+  has_type Phi Delta Gamma e (Data adv) ->
+  has_type Phi Delta Gamma (sync e) (Data adv).
