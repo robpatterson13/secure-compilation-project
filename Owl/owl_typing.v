@@ -387,7 +387,7 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   subtype ((negate_cond co) :: Phi) Delta t t' ->
   subtype Phi Delta t t'.
 
-Fixpoint last_var (l : nat) : fin (S l) :=
+Fixpoint last_var l : fin (S l) :=
   match l with
   | 0   => None           
   | S n => Some (last_var n) 
@@ -439,7 +439,7 @@ Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l 
   has_type Phi Delta Gamma e2 t ->
   has_type Phi Delta Gamma (assign e1 e2) Unit
 | T_IFun : forall e t t',
-  has_type Phi Delta (scons (arr t t') (scons t Gamma)) e t ->
+  has_type Phi Delta (scons t (scons (arr t t') Gamma)) e t ->
   has_type Phi Delta Gamma (fixlam e) (arr t t')
 | T_EFun : forall e1 e2 t t',
   has_type Phi Delta Gamma e1 (arr t t') ->
