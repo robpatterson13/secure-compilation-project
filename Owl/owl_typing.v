@@ -330,6 +330,9 @@ Qed.
 (* subtyping rules for Owl *)
 Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   ty l d -> ty l d -> Prop :=
+| ST_Var : forall x t',
+  subtype Phi Delta (Delta x) t' ->
+  subtype Phi Delta (var_ty x) t'
 | ST_Any : forall t,
   subtype Phi Delta t Any
 | ST_Unit : subtype Phi Delta Unit Unit
@@ -496,4 +499,8 @@ Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l 
   has_type Phi Delta Gamma (if_c co e1 e2) t
 | T_Sync : forall e (pf : l > 0),
   has_type Phi Delta Gamma e (Data (adv pf)) ->
-  has_type Phi Delta Gamma (sync e) (Data (adv pf)).
+  has_type Phi Delta Gamma (sync e) (Data (adv pf))
+| T_Sub : forall e t t',
+  subtype Phi Delta t t' ->
+  has_type Phi Delta Gamma e t ->
+  has_type Phi Delta Gamma e t'.
