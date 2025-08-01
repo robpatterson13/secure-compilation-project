@@ -10,9 +10,6 @@ From Coq Require Import Arith.Arith.
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
 
-(* adversary is always the first variable in scope *)
-Definition adv : (label 1) := (var_label var_zero).
-
 Definition gamma_context (l : nat) (d : nat) (m : nat) := fin m -> ty l d.
 
 Definition delta_context (l : nat) (d : nat) := fin d -> ty l d.
@@ -387,6 +384,31 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
   subtype ((negate_cond co) :: Phi) Delta t t' ->
   subtype Phi Delta t t'.
 
+Fixpoint last_var (l : nat) : fin (S l) :=
+  match l with
+  | 0   => None           
+  | S n => Some (last_var n) 
+  end.
+
+Require Import Lia.
+
+(* The adversary is the first defined, and therefore last variable, in scope *)
+Definition adv {l : nat} (pf : l > 0) : label l.
+Proof.
+  destruct l.
+  - lia. 
+  - exact (var_label (last_var l)).
+Defined.
+
+Lemma three_proof : 
+  3 > 0.
+Proof.
+lia.
+Qed.
+
+Transparent adv.
+Compute (adv three_proof).
+
 (* Typing rules for Owl *)
 Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l d) (Gamma : gamma_context l d m) :
   tm l m -> ty l d -> Prop :=
@@ -472,6 +494,6 @@ Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l 
   has_type (co :: Phi) Delta Gamma e1 t ->
   has_type (co :: Phi) Delta Gamma e2 t ->
   has_type Phi Delta Gamma (if_c co e1 e2) t
-| T_Sync : forall e,
-  has_type Phi Delta Gamma e (Data adv) ->
-  has_type Phi Delta Gamma (sync e) (Data adv).
+| T_Sync : forall e (pf : l > 0),
+  has_type Phi Delta Gamma e (Data (adv pf)) ->
+  has_type Phi Delta Gamma (sync e) (Data (adv pf)).
