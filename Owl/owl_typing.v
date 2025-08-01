@@ -10,6 +10,48 @@ From Coq Require Import Arith.Arith.
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
 
+Require Import FunctionalExtensionality.
+
+(* Probablity code *)
+Inductive Dist A :=
+    | Ret : A -> Dist A
+    | Flip : ( bool -> Dist A) -> Dist A.
+
+Check Ret.
+
+Arguments Ret [A].
+Arguments Flip [A].
+
+Fixpoint bind {A B} (c : Dist A) (k : A -> Dist B) : Dist B :=
+    match c with 
+    | Ret x => k x
+    | Flip f => Flip (fun x => bind (f x) k)
+    end.
+
+Definition flip : Dist bool := Flip (fun x => Ret x).
+
+Notation "x <- c1 ;; c2" := (bind c1 (fun x => c2))
+  (at level 100, c1 at next level, right associativity).
+
+Notation "'ret' x" := (Ret x)
+  (at level 100).
+
+Lemma bindA {A B C} (c : Dist A) (k : A -> Dist B) (k' : B -> Dist C) : 
+    (y <- (x <- c ;; k x);; k' y) =
+    (x <- c ;; y <- k x ;; k' y).
+    induction c; simpl.
+    auto.
+    f_equal.
+    apply functional_extensionality; intro; eauto.
+Qed.
+
+(* Example: *)
+
+Axiom foo : list nat -> Dist nat.
+Check (x <- foo (1 :: 2 :: 3 :: nil);; ret (x + 1)).
+
+(* Non-probability stuff *)
+
 Definition gamma_context (l : nat) (d : nat) (m : nat) := fin m -> ty l d.
 
 Definition delta_context (l : nat) (d : nat) := fin d -> ty l d.
@@ -132,7 +174,7 @@ Inductive is_value { l m } : tm l m -> Prop :=
   is_value (tlam e)
 | l_lam_value : forall e,
   is_value (l_lam e)
-| pack_value : forall v,
+| pack_value : forall v,  
   is_value v ->
   is_value (pack v).
 
@@ -228,74 +270,76 @@ Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
 
 (* General logic for non error reductions, and how they function *)
-Inductive reduction : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop := 
+Inductive reduction : (tm 0 0 * mem 0 0) -> Dist (tm 0 0 * mem 0 0) -> Prop := 
 | r_zero : forall b memory, 
-  reduction (zero (bitstring b), memory) ((bitstring (generate_zero b)), memory)
+  reduction (zero (bitstring b), memory) (Ret ((bitstring (generate_zero b)), memory))
 | r_ift : forall b e1 e2 memory, 
   all_zero b -> 
-  reduction (if_tm (bitstring b) e1 e2, memory) (e1, memory)
+  reduction (if_tm (bitstring b) e1 e2, memory) (Ret (e1, memory))
 | r_iff : forall b e1 e2 memory, 
   (not (all_zero b)) -> 
-  reduction (if_tm (bitstring b) e1 e2, memory) (e2, memory)
+  reduction (if_tm (bitstring b) e1 e2, memory) (Ret (e2, memory))
 | r_alloc : forall v memory,
   is_value v ->
   let res := (fresh memory) in
-  reduction (alloc v, memory) (loc res, (allocate res v memory))
+  reduction (alloc v, memory) (Ret (loc res, (allocate res v memory)))
 | r_deref : forall n memory v,
   memory n = Some v ->
-  reduction (dealloc (loc n), memory) (v, memory)
+  reduction (dealloc (loc n), memory) (Ret (v, memory))
 | r_assign : forall n v memory,
   is_value v ->
-  reduction (assign (loc n) v, memory) (skip, (allocate n v memory))
+  reduction (assign (loc n) v, memory) (Ret (skip, (allocate n v memory)))
 | r_fix : forall e v memory,
   is_value v ->
-  reduction (Core.app (fixlam e) v, memory) ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory)
+  reduction (Core.app (fixlam e) v, memory) (Ret ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory))
 | r_pair_l : forall v1 v2 memory,
   is_value v1 ->
   is_value v2 ->
-  reduction (left_tm (tm_pair v1 v2), memory) (v1, memory)
+  reduction (left_tm (tm_pair v1 v2), memory) (Ret (v1, memory))
 | r_pair_r : forall v1 v2 memory,
   is_value v1 ->
   is_value v2 ->
-  reduction (right_tm (tm_pair v1 v2), memory) (v2, memory)
+  reduction (right_tm (tm_pair v1 v2), memory) (Ret (v2, memory))
 | r_case_l : forall v e1 e2 memory,
   is_value v ->
-  reduction (case (inl v) e1 e2, memory) (subst_tm var_label(scons v var_tm) e1, memory)
+  reduction (case (inl v) e1 e2, memory) (Ret (subst_tm var_label(scons v var_tm) e1, memory))
 | r_case_r : forall v e1 e2 memory,
   is_value v ->
-  reduction (case (inr v) e1 e2, memory) (subst_tm var_label (scons v var_tm) e2, memory)
+  reduction (case (inr v) e1 e2, memory) (Ret (subst_tm var_label (scons v var_tm) e2, memory))
 | r_tapp : forall e memory,
-  reduction (tapp (tlam e), memory) (e, memory)
+  reduction (tapp (tlam e), memory) (Ret (e, memory))
 | r_lapp : forall e lab memory,
-  reduction (lapp (l_lam e) lab, memory) ((subst_tm (scons lab var_label) var_tm e), memory)
+  reduction (lapp (l_lam e) lab, memory) (Ret ((subst_tm (scons lab var_label) var_tm e), memory))
 | r_unpack : forall v e memory,
   is_value v ->
-  reduction (unpack (pack v) e, memory) (subst_tm var_label (scons v var_tm) e, memory)
+  reduction (unpack (pack v) e, memory) (Ret (subst_tm var_label (scons v var_tm) e, memory))
 | r_iflt : forall c e1 e2 memory,
   valid_constraint c ->
-  reduction (if_c c e1 e2, memory) (e1, memory)
+  reduction (if_c c e1 e2, memory) (Ret (e1, memory))
 | r_iflf : forall c e1 e2 memory,
   not (valid_constraint c) ->
-  reduction (if_c c e1 e2, memory) (e2, memory).
+  reduction (if_c c e1 e2, memory) (Ret (e2, memory)).
+
+Check reduction.
 
 (* To check if an evaluation is unable to continue/is malformed *)
 Definition stuck (v : tm 0 0) (memory : mem 0 0) :=
   not (is_value v) /\
-      (forall v' memory',
-        not (reduction (v, memory) (v', memory'))).
+      (forall (D : (Dist (tm 0 0 * mem 0 0))),
+        not (reduction (v, memory) D)).
 
 (* General logic for evaluating a term down: create a context and evaluate it or reduce to error *)
-Inductive step : (tm 0 0 * mem 0 0) -> (tm 0 0 * mem 0 0) -> Prop :=
-| step_ctx : forall K e memory e' memory',
-  reduction (e, memory) (e', memory') ->
-  step (Plug K e, memory) (Plug K e', memory')
+Inductive step : (tm 0 0 * mem 0 0) -> Dist (tm 0 0 * mem 0 0) -> Prop :=
+| step_ctx : forall K e memory D,
+  reduction (e, memory) D ->
+  step (Plug K e, memory) (e_mem <- D;; ret (Plug K (fst e_mem), (snd e_mem)))
 | step_error : forall v memory,
   stuck v memory ->
-  step (v, memory) (error, memory).
+  step (v, memory) (Ret (error, memory)).
 
 Lemma test_step :
   forall (memory : mem 0 0),
-    step ((zero (bitstring (bone (bone bend)))), memory) ((bitstring (bzero (bzero bend))), memory).
+    step ((zero (bitstring (bone (bone bend)))), memory) (ret ((bitstring (bzero (bzero bend))), memory)).
 Proof.
   intros.
   Check zero (bitstring (bone (bone bend))).
@@ -303,15 +347,15 @@ Proof.
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (step_ctx KHole (zero (bitstring (bone (bone bend)))) memory (bitstring (bzero (bzero bend))) memory) as Hn.
+  specialize (step_ctx KHole (zero (bitstring (bone (bone bend)))) memory (ret ((bitstring (bzero (bzero bend))), memory))) as Hn.
   specialize (r_zero (bone (bone bend)) memory) as Hx. simpl in Hx.
-  specialize (Hn Hx).
+  specialize (Hn Hx). simpl. simpl in Hn.
   assumption.
 Qed.
 
 Lemma test_error :
   forall (memory : mem 0 0),
-    step (zero skip, memory) (error, memory).
+    step (zero skip, memory) (ret (error, memory)).
 Proof.
   intros.
   specialize (step_error (zero skip) memory) as Hx.
@@ -389,7 +433,7 @@ Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
 
 Fixpoint last_var l : fin (S l) :=
   match l with
-  | 0   => None           
+  | 0   => None
   | S n => Some (last_var n) 
   end.
 
