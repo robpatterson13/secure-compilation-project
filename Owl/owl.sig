@@ -1,6 +1,7 @@
 nat : Type
 list : Functor
 Lcarrier : Type
+op : Type
 
 label : Type
 constr : Type
@@ -49,7 +50,7 @@ fixlam : (bind tm, tm in tm) -> tm
 tlam : tm -> tm
 l_lam : (bind label in tm) -> tm
 
-op : tm -> "list" (tm) -> tm
+Op : op -> "list" (tm) -> tm
 
 zero : tm -> tm
 app : tm -> tm -> tm

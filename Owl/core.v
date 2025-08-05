@@ -101,7 +101,7 @@ Definition option_comp {A B C} {f : A -> B} {g : B -> C} {h : A -> C}:
 Proof.
   intros H. destruct p as [a|]; cbn.
   - f_equal. apply H.
-  - reflexivity. 
+  - reflexivity.
 Defined.
 
 #[export] Hint Rewrite in_map_iff : FunctorInstances.
