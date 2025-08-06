@@ -231,6 +231,9 @@ Definition allocate {l m} (location : nat) (v : tm l m) (memory : mem l m) : (me
 
 Parameter fresh : forall {l m}, mem l m -> nat.
 
+Definition convert_to_bitstring (l d : nat) (bs : binary) : tm l d :=
+   (bitstring bs).
+
 Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
 
@@ -283,7 +286,10 @@ Inductive reduction : (tm 0 0 * mem 0 0) -> Dist (tm 0 0 * mem 0 0) -> Prop :=
   reduction (if_c c e1 e2, memory) (Ret (e1, memory))
 | r_iflf : forall c e1 e2 memory,
   not (valid_constraint c) ->
-  reduction (if_c c e1 e2, memory) (Ret (e2, memory)).
+  reduction (if_c c e1 e2, memory) (Ret (e2, memory))
+| r_op : forall f es bs memory,
+  es = (map (convert_to_bitstring 0 0) bs) ->
+  reduction ((Op f es), memory) (b <- (f bs);; (Ret (bitstring b, memory))).
 
 Check reduction.
 
