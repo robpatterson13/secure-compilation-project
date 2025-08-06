@@ -1,6 +1,5 @@
 From Stdlib Require Import FunctionalExtensionality.
 From Stdlib Require Import QArith.
-From Stdlib Require Import Classes.DecidableClass.
 From Stdlib Require Import List.
 
 Inductive Dist A :=
@@ -47,9 +46,10 @@ Definition eqDist {A} (c d : Dist A) :=
 
 Infix "~=" := eqDist (at level 70).
 
-Lemma flip_unused {A} (x : A) : 
-    (_ <- flip ;; ret x) ~= (ret x).
-    intro; simpl.
+Lemma flip_unused {A} (c : Dist A) : 
+    (_ <- flip ;; c) ~= c.
+    intro k.
+    simpl.
     field.
 Qed.
 
@@ -66,7 +66,6 @@ Lemma evalDist_bind {A B} (c : Dist A) (k : A -> Dist B) f :
 Qed.
 
 
-
 Lemma swap_bind {A B C} (c : Dist A) (d : Dist B) (k : A -> B -> Dist C) :
     (x <- c ;; y <- d ;; k x y)
     ~=
@@ -77,7 +76,14 @@ Fixpoint inSupport {A} (c : Dist A) (x : A) :=
   match c with 
   | Ret y => x = y
   | Flip f => inSupport (f false) x \/ inSupport (f true) x end.
+  
+Definition valid {A} (c : Dist A) (P : A -> Prop) :=
+  forall x, inSupport c x -> P x.
+  
+(* TODO make this work
 
+Notation "|= c { P } " := (valid c P) (at level 60).
+*)
 
 Lemma eqDist_cong_l {A B} (c d : Dist A) (k : A -> Dist B) : 
   c ~= d ->
@@ -88,3 +94,24 @@ Lemma eqDist_cong_r {A B} (c : Dist A) (k1 k2 : A -> Dist B) :
   (forall x, inSupport c x -> k1 x ~= k2 x) ->
   (x <- c ;; k1 x) ~= (x <- c ;; k2 x).
 Admitted.
+
+Lemma valid_bind {A B} (c : Dist A) P (k : A -> Dist B) Q :
+  valid c P -> 
+  (forall x, P x -> valid (k x) Q) ->
+  valid (x <- c ;; k x) Q.
+Admitted.
+
+Lemma valid_ret {A} (x : A) P :
+  P x ->
+  valid (ret x) P.
+Admitted. 
+
+Lemma valid_flip P : 
+  P false ->
+  P true ->
+  valid flip P.
+Admitted. 
+
+
+
+
