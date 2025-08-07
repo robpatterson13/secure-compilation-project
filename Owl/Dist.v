@@ -71,7 +71,6 @@ Lemma swap_bind {A B C} (c : Dist A) (d : Dist B) (k : A -> B -> Dist C) :
     (y <- d ;; x <- c ;; k x y).
 Proof.
   intro f.
-  repeat rewrite evalDist_bind.
   revert c.
   induction d; intro c.
   - simpl. rewrite evalDist_bind. reflexivity.
