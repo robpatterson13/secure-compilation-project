@@ -73,7 +73,7 @@ Proof.
   intro f.
   revert c.
   induction d; intro c.
-  - simpl. rewrite evalDist_bind. reflexivity.
+  - simpl. reflexivity.
   - simpl. 
     specialize (H false c) as Hf.
     specialize (H true c) as Ht. 
