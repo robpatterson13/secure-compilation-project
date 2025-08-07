@@ -1,6 +1,6 @@
-From Stdlib Require Import FunctionalExtensionality.
-From Stdlib Require Import QArith.
-From Stdlib Require Import List.
+Require Import FunctionalExtensionality.
+Require Import QArith.
+Require Import List.
 
 Inductive Dist A :=
     | Ret : A -> Dist A
@@ -65,12 +65,33 @@ Lemma evalDist_bind {A B} (c : Dist A) (k : A -> Dist B) f :
     field.
 Qed.
 
-
 Lemma swap_bind {A B C} (c : Dist A) (d : Dist B) (k : A -> B -> Dist C) :
     (x <- c ;; y <- d ;; k x y)
     ~=
     (y <- d ;; x <- c ;; k x y).
-Admitted. 
+Proof.
+  intro f.
+  revert c.
+  induction d; intro c.
+  - simpl. rewrite evalDist_bind. reflexivity.
+  - simpl. 
+    specialize (H false c) as Hf. 
+    specialize (H true c) as Ht. 
+    rewrite <- Ht.
+    rewrite <- Hf.
+    induction c.
+    + simpl. reflexivity.
+    + simpl.
+      specialize (H0 false) as IHf.
+      specialize (H0 true)  as IHt. 
+      rewrite IHf.
+      rewrite IHt. field. 
+      specialize (H false (d0 true)) as H'. assumption.
+      specialize (H true (d0 true)) as H'. assumption.
+      specialize (H false (d0 false)) as H'. assumption.
+      specialize (H true (d0 false)) as H'. assumption.
+Qed.
+    
 
 Fixpoint inSupport {A} (c : Dist A) (x : A) :=
   match c with 
