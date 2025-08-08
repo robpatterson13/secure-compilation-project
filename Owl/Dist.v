@@ -110,11 +110,25 @@ Lemma eqDist_cong_l {A B} (c d : Dist A) (k : A -> Dist B) :
   c ~= d ->
   (x <- c ;; k x) ~= (x <- d ;; k x).
 Admitted.
-
+    
 Lemma eqDist_cong_r {A B} (c : Dist A) (k1 k2 : A -> Dist B) : 
   (forall x, inSupport c x -> k1 x ~= k2 x) ->
   (x <- c ;; k1 x) ~= (x <- c ;; k2 x).
-Admitted.
+Proof.
+  intros. intro f.
+  induction c.
+  - simpl. specialize (H a).
+    simpl in H. unfold eqDist in H.
+    specialize (H) as H'. apply H'.
+    reflexivity.
+  - simpl. simpl in H. 
+    rewrite H0.
+    rewrite H0.
+    field.
+    + intros. apply H. right. assumption.
+    + intros. apply H. left. assumption.
+Qed.  
+
 
 Lemma valid_bind {A B} (c : Dist A) P (k : A -> Dist B) Q :
   valid c P -> 
