@@ -134,7 +134,24 @@ Lemma valid_bind {A B} (c : Dist A) P (k : A -> Dist B) Q :
   valid c P -> 
   (forall x, P x -> valid (k x) Q) ->
   valid (x <- c ;; k x) Q.
-Admitted.
+Proof.
+  intros.
+  induction c.
+  - simpl. apply H0. unfold valid in H.
+    specialize (H a). simpl in H. apply H. reflexivity.
+  - simpl. unfold valid. intros. unfold valid in H1. simpl in H2.
+    specialize (H1 true) as Ht.
+    specialize (H1 false) as Hf.
+    destruct H2.
+    apply Hf.
+    + intros. unfold valid in H. specialize (H x0). simpl in H. apply H.
+      left. assumption.
+    + assumption.
+    + apply Ht. intros. unfold valid in H. specialize (H x0). simpl in H. apply H.
+      right. assumption. assumption.
+Qed.
+
+
 
 Lemma valid_ret {A} (x : A) P :
   P x ->
