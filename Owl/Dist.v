@@ -109,7 +109,12 @@ Notation "|= c { P } " := (valid c P) (at level 60).
 Lemma eqDist_cong_l {A B} (c d : Dist A) (k : A -> Dist B) : 
   c ~= d ->
   (x <- c ;; k x) ~= (x <- d ;; k x).
-Admitted.
+Proof.
+  intros.
+  intro f.
+  repeat rewrite evalDist_bind.
+  apply H.
+Qed.
     
 Lemma eqDist_cong_r {A B} (c : Dist A) (k1 k2 : A -> Dist B) : 
   (forall x, inSupport c x -> k1 x ~= k2 x) ->
