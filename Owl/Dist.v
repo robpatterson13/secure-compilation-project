@@ -151,18 +151,31 @@ Proof.
       right. assumption. assumption.
 Qed.
 
-
-
 Lemma valid_ret {A} (x : A) P :
   P x ->
   valid (ret x) P.
-Admitted. 
+Proof.
+  intros.
+  unfold valid.
+  intros.
+  unfold inSupport in H0.
+  rewrite H0.
+  apply H.
+Qed.
 
 Lemma valid_flip P : 
   P false ->
   P true ->
   valid flip P.
-Admitted. 
+Proof.
+  intros.
+  unfold flip.
+  unfold valid.
+  intros.
+  destruct x.
+  - apply H0.
+  - apply H.
+Qed. 
 
 
 
