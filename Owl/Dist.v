@@ -101,10 +101,8 @@ Fixpoint inSupport {A} (c : Dist A) (x : A) :=
 Definition valid {A} (c : Dist A) (P : A -> Prop) :=
   forall x, inSupport c x -> P x.
   
-(* TODO make this work
 
-Notation "|= c { P } " := (valid c P) (at level 60).
-*)
+Notation "|= c { P }" := (valid c P) (at level 60, c at level 0, P at level 0).
 
 Lemma eqDist_cong_l {A B} (c d : Dist A) (k : A -> Dist B) : 
   c ~= d ->
@@ -134,9 +132,8 @@ Proof.
     + intros. apply H. left. assumption.
 Qed.  
 
-
 Lemma valid_bind {A B} (c : Dist A) P (k : A -> Dist B) Q :
-  valid c P -> 
+  |= c { P } -> 
   (forall x, P x -> valid (k x) Q) ->
   valid (x <- c ;; k x) Q.
 Proof.
@@ -158,7 +155,7 @@ Qed.
 
 Lemma valid_ret {A} (x : A) P :
   P x ->
-  valid (ret x) P.
+  |= (ret x) { P }.
 Proof.
   intros.
   unfold valid.
@@ -171,10 +168,24 @@ Qed.
 Lemma valid_flip P : 
   P false ->
   P true ->
-  valid flip P.
+  |= flip { P }.
 Proof.
   intros.
   unfold flip.
+  unfold valid.
+  intros.
+  destruct x.
+  - apply H0.
+  - apply H.
+Qed. 
+
+Lemma valid_flip_gen P : 
+  forall f,
+    P false ->
+    P true ->
+    |= (Flip f) { P }.
+Proof.
+  intros.
   unfold valid.
   intros.
   destruct x.
