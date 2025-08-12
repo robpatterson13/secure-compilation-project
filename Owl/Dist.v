@@ -85,7 +85,8 @@ Proof.
       specialize (H0 false) as IHf.
       specialize (H0 true)  as IHt. 
       rewrite IHf.
-      rewrite IHt. field. 
+      rewrite IHt.
+      field. 
       specialize (H false (d0 true)) as H'. assumption.
       specialize (H true (d0 true)) as H'. assumption.
       specialize (H false (d0 false)) as H'. assumption.
