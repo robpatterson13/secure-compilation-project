@@ -134,12 +134,12 @@ Qed.
 
 Lemma valid_bind {A B} (c : Dist A) P (k : A -> Dist B) Q :
   |= c { P } -> 
-  (forall x, P x -> valid (k x) Q) ->
-  valid (x <- c ;; k x) Q.
+  (forall x, P x -> |= (k x) {Q}) ->
+  |= (x <- c ;; k x) {Q}.
 Proof.
   intros.
   induction c.
-  - simpl. apply H0. unfold valid in H.
+  - simpl. apply H0.  unfold valid in H.
     specialize (H a). simpl in H. apply H. reflexivity.
   - simpl. unfold valid. intros. unfold valid in H1. simpl in H2.
     specialize (H1 true) as Ht.
