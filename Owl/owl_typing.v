@@ -1,4 +1,4 @@
-Require Import core fintype owl constants.
+Require Import core fintype owl constants Dist.
 
 Require Import List. 
 Import ListNotations.
@@ -143,6 +143,11 @@ Inductive is_value { l m } : tm l m -> Prop :=
   is_value v ->
   is_value (pack v).
 
+Inductive is_redex { l m } : tm l m -> Prop :=
+| zero_redex : forall v,
+  is_value v ->
+  is_redex (zero v).
+
 (* K context (continuance) for evaluation rules *)
 Inductive Kctx {l m : nat} :=
 | KHole : Kctx
@@ -238,79 +243,100 @@ Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
 
 (* General logic for non error reductions, and how they function *)
-Inductive reduction : (tm 0 0 * mem 0 0) -> Dist (tm 0 0 * mem 0 0) -> Prop := 
-| r_zero : forall b memory, 
-  reduction (zero (bitstring b), memory) (Ret ((bitstring (generate_zero b)), memory))
-| r_ift : forall b e1 e2 memory, 
+Inductive tm_reduction : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop := 
+| r_zero : forall b memory s, 
+  tm_reduction (zero (bitstring b), memory, s) (Ret ((bitstring (generate_zero b)), memory, s))
+| r_ift : forall b e1 e2 memory s, 
   all_zero b -> 
-  reduction (if_tm (bitstring b) e1 e2, memory) (Ret (e1, memory))
-| r_iff : forall b e1 e2 memory, 
+  tm_reduction (if_tm (bitstring b) e1 e2, memory, s) (Ret (e1, memory, s))
+| r_iff : forall b e1 e2 memory s, 
   (not (all_zero b)) -> 
-  reduction (if_tm (bitstring b) e1 e2, memory) (Ret (e2, memory))
-| r_alloc : forall v memory,
+  tm_reduction (if_tm (bitstring b) e1 e2, memory, s) (Ret (e2, memory, s))
+| r_alloc : forall v memory s,
   is_value v ->
   let res := (fresh memory) in
-  reduction (alloc v, memory) (Ret (loc res, (allocate res v memory)))
-| r_deref : forall n memory v,
+  tm_reduction (alloc v, memory, s) (Ret (loc res, (allocate res v memory), s))
+| r_deref : forall n memory v s,
   memory n = Some v ->
-  reduction (dealloc (loc n), memory) (Ret (v, memory))
-| r_assign : forall n v memory,
+  tm_reduction (dealloc (loc n), memory, s) (Ret (v, memory, s))
+| r_assign : forall n v memory s,
   is_value v ->
-  reduction (assign (loc n) v, memory) (Ret (skip, (allocate n v memory)))
-| r_fix : forall e v memory,
+  tm_reduction (assign (loc n) v, memory, s) (Ret (skip, (allocate n v memory), s))
+| r_fix : forall e v memory s,
   is_value v ->
-  reduction (Core.app (fixlam e) v, memory) (Ret ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory))
-| r_pair_l : forall v1 v2 memory,
+  tm_reduction (Core.app (fixlam e) v, memory, s) (Ret ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory, s))
+| r_pair_l : forall v1 v2 memory s,
   is_value v1 ->
   is_value v2 ->
-  reduction (left_tm (tm_pair v1 v2), memory) (Ret (v1, memory))
-| r_pair_r : forall v1 v2 memory,
+  tm_reduction (left_tm (tm_pair v1 v2), memory, s) (Ret (v1, memory, s))
+| r_pair_r : forall v1 v2 memory s,
   is_value v1 ->
   is_value v2 ->
-  reduction (right_tm (tm_pair v1 v2), memory) (Ret (v2, memory))
-| r_case_l : forall v e1 e2 memory,
+  tm_reduction (right_tm (tm_pair v1 v2), memory, s) (Ret (v2, memory, s))
+| r_case_l : forall v e1 e2 memory s,
   is_value v ->
-  reduction (case (inl v) e1 e2, memory) (Ret (subst_tm var_label(scons v var_tm) e1, memory))
-| r_case_r : forall v e1 e2 memory,
+  tm_reduction (case (inl v) e1 e2, memory, s) (Ret (subst_tm var_label(scons v var_tm) e1, memory, s))
+| r_case_r : forall v e1 e2 memory s,
   is_value v ->
-  reduction (case (inr v) e1 e2, memory) (Ret (subst_tm var_label (scons v var_tm) e2, memory))
-| r_tapp : forall e memory,
-  reduction (tapp (tlam e), memory) (Ret (e, memory))
-| r_lapp : forall e lab memory,
-  reduction (lapp (l_lam e) lab, memory) (Ret ((subst_tm (scons lab var_label) var_tm e), memory))
-| r_unpack : forall v e memory,
+  tm_reduction (case (inr v) e1 e2, memory, s) (Ret (subst_tm var_label (scons v var_tm) e2, memory, s))
+| r_tapp : forall e memory s,
+  tm_reduction (tapp (tlam e), memory, s) (Ret (e, memory, s))
+| r_lapp : forall e lab memory s,
+  tm_reduction (lapp (l_lam e) lab, memory, s) (Ret ((subst_tm (scons lab var_label) var_tm e), memory, s))
+| r_unpack : forall v e memory s,
   is_value v ->
-  reduction (unpack (pack v) e, memory) (Ret (subst_tm var_label (scons v var_tm) e, memory))
-| r_iflt : forall c e1 e2 memory,
+  tm_reduction (unpack (pack v) e, memory, s) (Ret (subst_tm var_label (scons v var_tm) e, memory, s))
+| r_iflt : forall c e1 e2 memory s,
   valid_constraint c ->
-  reduction (if_c c e1 e2, memory) (Ret (e1, memory))
-| r_iflf : forall c e1 e2 memory,
+  tm_reduction (if_c c e1 e2, memory, s) (Ret (e1, memory, s))
+| r_iflf : forall c e1 e2 memory s,
   not (valid_constraint c) ->
-  reduction (if_c c e1 e2, memory) (Ret (e2, memory))
-| r_op : forall f es bs memory,
+  tm_reduction (if_c c e1 e2, memory, s) (Ret (e2, memory, s))
+| r_op : forall f es bs memory s,
   es = (map (convert_to_bitstring 0 0) bs) ->
-  reduction ((Op f es), memory) (b <- (f bs);; (Ret (bitstring b, memory))).
+  tm_reduction ((Op f es), memory, s) (b <- (f bs);; (Ret (bitstring b, memory, s))).
 
-Check reduction.
+Check tm_reduction.
 
 (* To check if an evaluation is unable to continue/is malformed *)
-Definition stuck (v : tm 0 0) (memory : mem 0 0) :=
+Definition stuck (v : tm 0 0) (memory : mem 0 0) (s : binary) :=
   not (is_value v) /\
-      (forall (D : (Dist (tm 0 0 * mem 0 0))),
-        not (reduction (v, memory) D)).
+      (forall (D : (Dist (tm 0 0 * mem 0 0 * binary))),
+        not (tm_reduction (v, memory, s) D)).
 
-(* General logic for evaluating a term down: create a context and evaluate it or reduce to error *)
-Inductive step : (tm 0 0 * mem 0 0) -> Dist (tm 0 0 * mem 0 0) -> Prop :=
-| step_ctx : forall K e memory D,
-  reduction (e, memory) D ->
-  step (Plug K e, memory) (e_mem <- D;; ret (Plug K (fst e_mem), (snd e_mem)))
-| step_error : forall v memory,
-  stuck v memory ->
-  step (v, memory) (Ret (error, memory)).
+(* Integrate stuck as a reducible result *)
+Inductive reduce : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop := 
+| reduce_tm : forall A B,
+  tm_reduction A B ->
+  reduce A B
+| reduce_stuck : forall v memory s,
+  stuck v memory s ->
+  reduce (v, memory, s) (Ret (error, memory, s)).
 
-Lemma test_step :
-  forall (memory : mem 0 0),
-    step ((zero (bitstring (bone (bone bend)))), memory) (ret ((bitstring (bzero (bzero bend))), memory)).
+Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
+  let '(e,m,s) := c in (Plug K e, m, s).
+  
+(* General logic for evaluating a term down/performing steps of an execution *)
+Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
+| exec_return : forall k e m s,
+  is_value e \/ k = 0 ->
+  exec k (e, m, s) (ret (e, m, s))
+| exec_step : forall k K r m s D R,
+  reduce (r, m, s) D ->
+  exec_dist k K D R ->
+  exec (S k) (Plug K r, m, s) R
+with exec_dist : nat -> Kctx -> Dist (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
+| exec_dist_ret : forall k K c R,
+  exec k (plug_dist K c) R ->
+  exec_dist k K (Ret c) R
+| exec_dist_flip : forall k K f R,
+  (forall b, exec_dist k K (f b) (R b)) ->
+  exec_dist k K (Flip f) (Flip R).
+
+(* Test step/execute lemmas to see if we're in the correct place *)
+Lemma test_exec :
+  forall (memory : mem 0 0) s,
+    exec 10 ((zero (bitstring (bone (bone bend)))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
   intros.
   Check zero (bitstring (bone (bone bend))).
@@ -318,29 +344,46 @@ Proof.
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (step_ctx KHole (zero (bitstring (bone (bone bend)))) memory (ret ((bitstring (bzero (bzero bend))), memory))) as Hn.
-  specialize (r_zero (bone (bone bend)) memory) as Hx. simpl in Hx.
-  specialize (Hn Hx). simpl. simpl in Hn.
-  assumption.
+  specialize (exec_step 9 KHole (zero (bitstring (bone (bone bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hn.
+  simpl in Hn.
+  specialize (Hn (ret ((bitstring (bzero (bzero bend))), memory, s))).
+  simpl in Hn.
+  specialize (r_zero (bone (bone bend)) memory s) as Hx. simpl in Hx.
+  specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret (bitstring (bzero (bzero bend)), memory, s)) Hx) as Hr.
+  specialize (Hn Hr). simpl.
+  apply Hn.
+  constructor. 
+  simpl.
+  constructor. 
+  left.
+  constructor.
 Qed.
 
 Lemma test_error :
-  forall (memory : mem 0 0),
-    step (zero skip, memory) (ret (error, memory)).
+  forall (memory : mem 0 0) s,
+    exec 5 (zero skip, memory, s) (ret (error, memory, s)).
 Proof.
   intros.
-  specialize (step_error (zero skip) memory) as Hx.
-  assert (stuck (zero skip) memory) as Hs. {
+  assert (stuck (zero skip) memory s) as Hs. {
     unfold stuck.
     split.
     - intros H. inversion H.
     - intros. intro H. inversion H. 
   }
-  specialize (Hx Hs).
-  assumption.
+  specialize (reduce_stuck (zero skip) memory s Hs) as Hr.
+  specialize (exec_step 4 KHole (zero skip) memory s (ret (error, memory, s))) as Hx.
+  simpl in Hx.
+  specialize (Hx (ret (error, memory, s))). simpl in Hx.
+  specialize (Hx Hr).
+  apply Hx.
+  constructor.
+  simpl.
+  constructor.
+  left.
+  constructor.
 Qed.
 
-(* Complete subtyping next, minus the material about ops... probablity later *)
+(* Complete subtyping next, minus the material about ops... probablity later or maybe right now *)
 
 (* subtyping rules for Owl *)
 Inductive subtype {l d} (Phi : phi_context l) (Delta : delta_context l d) :
