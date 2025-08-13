@@ -195,5 +195,33 @@ Proof.
 Qed. 
 
 
+Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) : Prop :=
+  exists (c : Dist (A * B)), 
+    d1 ~= (x <- c ;; Ret (fst x)) /\
+    d2 ~= (x <- c ;; Ret (snd x)) /\
+    |= c { fun '(x, y) => R x y }.
+
+  (* TODO make this work for parsing *)
+Notation "|= c ~ d { P }" := (coupling P c d) (at level 60, c at level 0, P at level 0).
+
+Lemma coupling_refl {A} (d : Dist A) : 
+  coupling eq d d.
+Admitted.
+
+Lemma coupling_flip_opp :
+  coupling (fun x y => x = negb y) flip flip.
+Admitted.
+
+Lemma coupling_eq {A} (d1 d2 : Dist A) : 
+  coupling eq d1 d2 -> 
+  d1 ~= d2.
+Admitted.
+
+(* TODO: the natural rule for bind: if |= c1 ~ c2 { R }, and if forall x and y,  
+  R x y implies |= (k1 x) ~ (k2 y) { Q }, then 
+  |= (x <- c1 ;; k1 x) ~ (y <- c2 ;; k2 x) { Q }.
+*)
+
+
 
 
