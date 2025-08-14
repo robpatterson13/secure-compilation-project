@@ -361,6 +361,50 @@ Proof.
   - specialize (H0 true c H1) as Hw. apply Hw.
 Qed.
 
+Definition coin_flip : op :=
+  fun (x : list binary) =>
+    b <- flip ;;
+    ret (if b then bone bend else bzero bend).
+
+Lemma tester :
+  coin_flip = coin_flip.
+Proof.
+  unfold coin_flip. simpl. reflexivity.
+Qed.
+
+Definition coin_Op : tm 0 0 := (Op coin_flip []).
+
+Lemma exec_coin_Op :
+  forall (memory : mem 0 0) s,
+    exec 10 (Op coin_flip [], memory, s)
+             (Flip (fun b =>
+                      ret (bitstring (if b then bone bend else bzero bend), memory, s))).
+Proof.
+  intros.
+  assert ((Plug KHole (Op coin_flip [])) = Op coin_flip []) as Ht. {
+    simpl. reflexivity.
+  }
+  rewrite <- Ht.
+  specialize (exec_step_flip 9 KHole (Op coin_flip []) memory s) as Hf.
+  specialize (Hf (fun b => ret (bitstring (if b then bone bend else bzero bend), memory, s))).
+  simpl in Hf.
+  specialize (Hf (fun x => (ret x))).
+  simpl in Hf.
+  specialize (r_op coin_flip [] [] memory s) as Ho. simpl in Ho.
+  assert (forall (lst : list (tm 0 0)), lst = lst) as free. {
+    intros.
+    reflexivity.
+  }
+  specialize (Ho (free [])).
+  specialize (reduce_tm (Op coin_flip [], memory, s) (Flip (fun x : bool => ret (bitstring (if x then bone bend else bzero bend), memory, s)))) as Hr.
+  specialize (Hr Ho).
+  specialize (Hf Hr).
+  specialize (Hf).
+  apply Hf. intros.
+  inversion H; subst. simpl.
+  constructor. left. constructor.
+Qed.
+
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma test_exec :
   forall (memory : mem 0 0) s,
