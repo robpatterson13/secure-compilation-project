@@ -331,7 +331,7 @@ with exec_dist : nat -> Kctx -> Dist (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0
   exec_dist k K (Ret c) R
 | exec_dist_flip : forall k K f R,
   (forall b, exec_dist k K (f b) (R b)) ->
-  exec_dist k K (Flip f) (Flip R).
+  exec_dist k K (Flip f) (Flip R).  
 
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma test_exec :
@@ -359,6 +359,41 @@ Proof.
   constructor.
 Qed.
 
+Lemma test_exec_2 :
+  forall (memory : mem 0 0) s,
+    exec 10 ((zero (zero (bitstring (bone (bone bend))))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s)).
+Proof.
+  intros.
+  assert ((Plug (ZeroK KHole) (zero (bitstring (bone (bone bend))))) = (zero (zero (bitstring (bone (bone bend)))))) as Ht. {
+    simpl. reflexivity.
+  }
+  rewrite <- Ht. specialize (exec_step 9 (ZeroK KHole) (zero (bitstring (bone (bone bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s)) (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hes.
+  simpl in Hes.
+  specialize (r_zero (bone (bone bend)) memory s) as Hx.
+  specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret(bitstring (bzero (bzero bend)), memory, s))) as Hr.
+  specialize (Hr Hx).
+  specialize (Hes Hr).
+  simpl.
+  apply Hes.
+  constructor.
+  simpl.
+  clear Hr Hx Hes Ht. 
+  assert ((Plug KHole (zero (bitstring (bzero (bzero bend))))) = (zero (bitstring (bzero (bzero bend))))) as Ht. {
+    simpl. reflexivity.
+  }
+  specialize (exec_step 8 KHole (zero (bitstring (bzero (bzero bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hs.
+  specialize (Hs (ret ((bitstring (bzero (bzero bend))), memory, s))).
+  specialize (r_zero (bzero (bzero bend)) memory s) as Hz.
+  specialize (reduce_tm (zero (bitstring (bzero (bzero bend))), memory, s) (ret (bitstring (generate_zero (bzero (bzero bend))), memory, s)) Hz) as Hr.
+  specialize (Hs Hr). 
+  apply Hs.
+  constructor.
+  simpl.
+  constructor.
+  left.
+  constructor.
+Qed.
+  
 Lemma test_error :
   forall (memory : mem 0 0) s,
     exec 5 (zero skip, memory, s) (ret (error, memory, s)).
