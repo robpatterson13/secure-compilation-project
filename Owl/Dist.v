@@ -194,7 +194,6 @@ Proof.
   - apply H.
 Qed. 
 
-
 Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) : Prop :=
   exists (c : Dist (A * B)), 
     d1 ~= (x <- c ;; Ret (fst x)) /\
@@ -202,10 +201,12 @@ Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) : P
     |= c { fun '(x, y) => R x y }.
 
   (* TODO make this work for parsing *)
-Notation "|= c ~ d { P }" := (coupling P c d) (at level 60, c at level 0, P at level 0).
+Notation "|= c ~ d { P }" := (coupling P c d) (at level 60, d at level 0, c at level 0, P at level 0).
 
 Lemma coupling_refl {A} (d : Dist A) : 
-  coupling eq d d.
+  |= d ~ d { eq }.
+Proof.
+  unfold coupling.
 Admitted.
 
 Lemma coupling_flip_opp :

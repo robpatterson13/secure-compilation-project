@@ -6,6 +6,9 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
+Record Adv := {
+}.
+
 (* l for label variables in scope *)
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
@@ -321,17 +324,42 @@ Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * 
 | exec_return : forall k e m s,
   is_value e \/ k = 0 ->
   exec k (e, m, s) (ret (e, m, s))
-| exec_step : forall k K r m s D R,
-  reduce (r, m, s) D ->
-  exec_dist k K D R ->
-  exec (S k) (Plug K r, m, s) R
-with exec_dist : nat -> Kctx -> Dist (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
-| exec_dist_ret : forall k K c R,
+| exec_step :
+    forall k K r m s D C,
+      reduce (r, m, s) D ->
+      (forall c, inSupport D c -> exec k (plug_dist K c) (C c)) ->
+      exec (S k) (Plug K r, m, s) (c <- D ;; C c).
+
+(* Potentially useful supporting lemma for Return dists *)
+Lemma exec_step_ret : forall k K r m s c R,
+  reduce (r, m, s) (Ret c) ->
   exec k (plug_dist K c) R ->
-  exec_dist k K (Ret c) R
-| exec_dist_flip : forall k K f R,
-  (forall b, exec_dist k K (f b) (R b)) ->
-  exec_dist k K (Flip f) (Flip R).  
+  exec (S k) (Plug K r, m, s) R.
+Proof.
+  intros.
+  specialize (exec_step k K r m s (ret c) (fun x => R) H) as Hs.
+  simpl in Hs. apply Hs.
+  intros.
+  unfold inSupport in H1. rewrite H1. assumption.  
+Qed.
+
+(* Potentially useful supporting lemma for Flip dists *)
+Lemma exec_step_flip :
+  forall k K r m s f C,
+    reduce (r,m,s) (Flip f) ->
+    (forall b c, inSupport (f b) c ->
+                 exec k (plug_dist K c) (C c)) ->
+    exec (S k) (Plug K r, m, s)
+         (Flip (fun b => (c <- f b ;; C c))).
+Proof.
+  intros. 
+  specialize (exec_step k K r m s (Flip f) C H) as He.
+  apply He.
+  intros. simpl in H1.
+  destruct H1.
+  - specialize (H0 false c H1) as Hw. apply Hw.
+  - specialize (H0 true c H1) as Hw. apply Hw.
+Qed.
 
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma test_exec :
@@ -344,7 +372,7 @@ Proof.
     simpl. reflexivity.
   }
   rewrite <- Ht.
-  specialize (exec_step 9 KHole (zero (bitstring (bone (bone bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hn.
+  specialize (exec_step_ret 9 KHole (zero (bitstring (bone (bone bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s)) as Hn.
   simpl in Hn.
   specialize (Hn (ret ((bitstring (bzero (bzero bend))), memory, s))).
   simpl in Hn.
@@ -352,8 +380,6 @@ Proof.
   specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret (bitstring (bzero (bzero bend)), memory, s)) Hx) as Hr.
   specialize (Hn Hr). simpl.
   apply Hn.
-  constructor. 
-  simpl.
   constructor. 
   left.
   constructor.
@@ -363,11 +389,13 @@ Lemma test_exec_2 :
   forall (memory : mem 0 0) s,
     exec 10 ((zero (zero (bitstring (bone (bone bend))))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
+  (* Exec Step 1 *)
   intros.
   assert ((Plug (ZeroK KHole) (zero (bitstring (bone (bone bend))))) = (zero (zero (bitstring (bone (bone bend)))))) as Ht. {
     simpl. reflexivity.
   }
-  rewrite <- Ht. specialize (exec_step 9 (ZeroK KHole) (zero (bitstring (bone (bone bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s)) (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hes.
+  rewrite <- Ht. 
+  specialize (exec_step_ret 9 (ZeroK KHole) (zero (bitstring (bone (bone bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hes.
   simpl in Hes.
   specialize (r_zero (bone (bone bend)) memory s) as Hx.
   specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret(bitstring (bzero (bzero bend)), memory, s))) as Hr.
@@ -375,20 +403,18 @@ Proof.
   specialize (Hes Hr).
   simpl.
   apply Hes.
-  constructor.
+  (* Exec Step 2 *)
   simpl.
   clear Hr Hx Hes Ht. 
   assert ((Plug KHole (zero (bitstring (bzero (bzero bend))))) = (zero (bitstring (bzero (bzero bend))))) as Ht. {
     simpl. reflexivity.
   }
-  specialize (exec_step 8 KHole (zero (bitstring (bzero (bzero bend)))) memory s (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hs.
+  specialize (exec_step_ret 8 KHole (zero (bitstring (bzero (bzero bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s)) as Hs.
   specialize (Hs (ret ((bitstring (bzero (bzero bend))), memory, s))).
   specialize (r_zero (bzero (bzero bend)) memory s) as Hz.
   specialize (reduce_tm (zero (bitstring (bzero (bzero bend))), memory, s) (ret (bitstring (generate_zero (bzero (bzero bend))), memory, s)) Hz) as Hr.
   specialize (Hs Hr). 
   apply Hs.
-  constructor.
-  simpl.
   constructor.
   left.
   constructor.
@@ -406,13 +432,11 @@ Proof.
     - intros. intro H. inversion H. 
   }
   specialize (reduce_stuck (zero skip) memory s Hs) as Hr.
-  specialize (exec_step 4 KHole (zero skip) memory s (ret (error, memory, s))) as Hx.
+  specialize (exec_step_ret 4 KHole (zero skip) memory s (error, memory, s)) as Hx.
   simpl in Hx.
   specialize (Hx (ret (error, memory, s))). simpl in Hx.
   specialize (Hx Hr).
   apply Hx.
-  constructor.
-  simpl.
   constructor.
   left.
   constructor.
