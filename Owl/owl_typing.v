@@ -320,6 +320,7 @@ Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * me
   let '(e,m,s) := c in (Plug K e, m, s).
   
 (* General logic for evaluating a term down/performing steps of an execution *)
+(* C represents some sort of Exec function *)
 Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
 | exec_return : forall k e m s,
   is_value e \/ k = 0 ->
@@ -361,18 +362,66 @@ Proof.
   - specialize (H0 true c H1) as Hw. apply Hw.
 Qed.
 
+(* Sample Coin Flip Op *)
 Definition coin_flip : op :=
   fun (x : list binary) =>
     b <- flip ;;
     ret (if b then bone bend else bzero bend).
 
+Definition first_binary (xs : list binary) : binary :=
+  match xs with
+  | x :: _ => x
+  | []     => bend
+  end.
+
+Definition second_binary (xs : list binary) : binary :=
+  match xs with
+  | _ :: y :: _ => y
+  | _           => bend
+  end.
+
+(* Sample Coin Flip Op *)
+Definition coin_flip_plus : op :=
+  fun (x : list binary) =>
+    b <- flip ;;
+    ret (if b then (first_binary x) else (second_binary x)).
+
+Definition double_coin_flip : op :=
+  fun (x : list binary) =>
+    a <- flip ;;
+    b <- flip ;;
+    ret (if a then (first_binary x) else if b then (first_binary x) else bzero bend).
+
+(* Quick unfold *)
 Lemma tester :
   coin_flip = coin_flip.
 Proof.
   unfold coin_flip. simpl. reflexivity.
 Qed.
 
+(* Quick unfold 2 *)
+Lemma tester2 :
+  double_coin_flip = double_coin_flip.
+Proof.
+  unfold double_coin_flip. simpl. reflexivity.
+Qed.
+
 Definition coin_Op : tm 0 0 := (Op coin_flip []).
+
+Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))]).
+
+Lemma exec_coin_Op_plus :
+  forall (memory : mem 0 0) s,
+    exec 10 ((zero coin_Op_plus), memory, s)
+             (Flip (fun b =>
+                      ret (bitstring (if b then (bzero (bzero bend)) else bzero bend), memory, s))).
+Proof.
+  intros.
+  assert ((Plug (ZeroK KHole) coin_Op_plus) = (zero coin_Op_plus)) as Ht. {
+    simpl. reflexivity.
+  }
+  rewrite <- Ht.
+Admitted.
 
 Lemma exec_coin_Op :
   forall (memory : mem 0 0) s,
