@@ -272,6 +272,13 @@ Fixpoint all_zero (b : binary) : Prop :=
   | bend => True 
   end.
 
+Fixpoint all_zero_b (b : binary) : bool :=
+  match b with
+  | (bone b') => false
+  | (bzero b') => (all_zero_b b')
+  | bend => true 
+  end.
+
 Definition mem (l m : nat) := nat -> option (tm l m).
 
 (* Memory only contains value terms *)
