@@ -201,6 +201,16 @@ Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    | KSync K' => (sync (Plug K' t))
    end.
 
+Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
+  match e with
+  | zero e =>
+      match decompose e with
+      | Some (K, r) => Some (ZeroK K, r)
+      | None => Some (KHole, zero e) 
+      end
+  | _ => None
+  end.
+
 (* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
   match b with
@@ -410,6 +420,12 @@ Definition coin_Op : tm 0 0 := (Op coin_flip []).
 
 Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))]).
 
+Definition C_zero (c : tm 0 0 * mem 0 0 * binary) : Dist (tm 0 0 * mem 0 0 * binary) :=
+  match c with
+  | (bitstring b, m', s') => ret (bitstring (generate_zero b), m', s')
+  | (e, m', s')  => ret (e, m', s') 
+  end.
+
 Lemma exec_coin_Op_plus :
   forall (memory : mem 0 0) s,
     exec 10 ((zero coin_Op_plus), memory, s)
@@ -420,7 +436,41 @@ Proof.
   assert ((Plug (ZeroK KHole) coin_Op_plus) = (zero coin_Op_plus)) as Ht. {
     simpl. reflexivity.
   }
-  rewrite <- Ht.
+  rewrite <- Ht. 
+  specialize (exec_step 9 (ZeroK KHole) coin_Op_plus memory s) as Hf.
+  specialize (Hf (Flip (fun b => ret (bitstring (if b then (bone (bone bend)) else bone bend), memory, s)))).
+  simpl in Hf.
+  specialize (Hf C_zero).
+  simpl in Hf.
+  assert ((fun x : bool =>
+           ret (@bitstring 0 0 (generate_zero (if x then bone (bone bend) else bone bend)), memory, s)) = 
+          (fun b : bool => 
+           ret (bitstring (if b then bzero (bzero bend) else bzero bend), memory, s))) as Htr.
+  {
+    simpl.
+    apply functional_extensionality. destruct x.
+    - simpl. reflexivity.
+    - simpl. reflexivity. 
+  }
+  rewrite Htr in Hf. 
+  apply Hf.
+  - specialize (r_op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))] [(bone (bone bend)) ; (bone bend)]) as Hp.
+    specialize (Hp memory s).
+    assert ([bitstring (bone (bone bend)); bitstring (bone bend)] =
+     list_map (convert_to_bitstring 0 0) [bone (bone bend); bone bend]) as Heq.
+     {
+      reflexivity.
+     }
+    specialize (Hp Heq). simpl in Hp.
+    apply reduce_tm in Hp.
+    unfold coin_Op_plus.
+    apply Hp.
+  - intros.
+    clear Ht Hf Htr.
+    destruct H.
+    + rewrite H. simpl. 
+    
+     
 Admitted.
 
 Lemma exec_coin_Op :
