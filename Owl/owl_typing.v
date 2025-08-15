@@ -86,6 +86,19 @@ Definition valid_constraint (co : constr 0) : Prop :=
   | (condition nlt x y) => L.(leq) (interp_lattice x) (interp_lattice y) = false \/ L.(leq) (interp_lattice y) (interp_lattice x) = false
   end.
 
+(* Check if a constraint is valid, under the assumption it is closed - Boolean version *)
+Definition valid_constraint_b (co : constr 0) : bool :=
+  match co with
+  | (condition Core.leq x y) => L.(leq) (interp_lattice x) (interp_lattice y) 
+  | (condition geq x y) => L.(leq) (interp_lattice y) (interp_lattice x)
+  | (condition gt x y) => L.(leq) (interp_lattice y) (interp_lattice x) && negb (L.(leq) (interp_lattice x) (interp_lattice y))
+  | (condition lt x y) => L.(leq) (interp_lattice x) (interp_lattice y) && negb (L.(leq) (interp_lattice y) (interp_lattice x))
+  | (condition nleq x y) => negb (L.(leq) (interp_lattice y) (interp_lattice x))
+  | (condition ngeq x y) => negb (L.(leq) (interp_lattice y) (interp_lattice x))
+  | (condition ngt x y) => negb (L.(leq) (interp_lattice y) (interp_lattice x)) || L.(leq) (interp_lattice x) (interp_lattice y)
+  | (condition nlt x y) => negb (L.(leq) (interp_lattice x) (interp_lattice y)) || negb (L.(leq) (interp_lattice y) (interp_lattice x))
+  end.
+
 Definition phi_map (l : nat) : Type := (fin l) -> (label 0).
 
 Definition phi_map_holds (l : nat) (pm : phi_map l) (co : constr l) : Prop := 
@@ -145,6 +158,38 @@ Inductive is_value { l m } : tm l m -> Prop :=
 | pack_value : forall v,  
   is_value v ->
   is_value (pack v).
+
+(* Checks for proper values within terms - Boolean version *)
+Fixpoint is_value_b {l m} (t : tm l m) : bool :=
+  match t with
+  | error            => true
+  | skip             => true
+  | loc _            => true
+  | bitstring _      => true
+  | fixlam _         => true
+  | tlam _           => true
+  | l_lam _          => true
+  | tm_pair v1 v2    => is_value_b v1 && is_value_b v2
+  | inl v            => is_value_b v
+  | inr v            => is_value_b v
+  | pack v           => is_value_b v
+  | var_tm _         => false
+  | Op _ _           => false
+  | zero _           => false
+  | Core.app _ _          => false
+  | alloc _          => false
+  | dealloc _        => false
+  | assign _ _       => false
+  | left_tm _        => false
+  | right_tm _       => false
+  | case _ _ _       => false
+  | tapp _           => false
+  | lapp _ _         => false
+  | unpack _ _       => false
+  | if_tm _ _ _      => false
+  | if_c _ _ _       => false
+  | sync _           => false
+  end.
 
 Inductive is_redex { l m } : tm l m -> Prop :=
 | zero_redex : forall v,
