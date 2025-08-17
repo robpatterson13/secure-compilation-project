@@ -211,12 +211,40 @@ Admitted.
 
 Lemma coupling_flip_opp :
   coupling (fun x y => x = negb y) flip flip.
-Admitted.
+Proof.
+  unfold coupling.
+  exists (Flip (fun x => (Ret (x, (negb x))))).
+  split.
+  simpl. unfold flip. unfold eqDist. intros. simpl. reflexivity.
+  split.
+  simpl. unfold flip. unfold eqDist. intros. simpl. field.
+  unfold valid. intros. unfold inSupport in H. destruct H.
+  inversion H; subst. simpl. reflexivity.
+  inversion H; subst. simpl. reflexivity.
+Qed.
 
 Lemma coupling_eq {A} (d1 d2 : Dist A) : 
   coupling eq d1 d2 -> 
   d1 ~= d2.
-Admitted.
+Proof.
+  intros.
+  unfold eqDist. unfold coupling in H.
+  destruct H. destruct H. destruct H0.
+  intros. 
+  unfold eqDist in H. specialize (H x0).
+  unfold eqDist in H0. specialize (H0 x0).
+  rewrite H. rewrite H0. 
+  unfold valid in H1. 
+  apply eqDist_cong_r.
+  intros.
+  specialize (H1 x1 H2).
+  destruct x1.
+  simpl.
+  rewrite H1.
+  unfold eqDist.
+  intros.
+  reflexivity.
+Qed.
 
 (* TODO: the natural rule for bind: if |= c1 ~ c2 { R }, and if forall x and y,  
   R x y implies |= (k1 x) ~ (k2 y) { Q }, then 
