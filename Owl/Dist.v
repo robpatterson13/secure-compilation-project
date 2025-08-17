@@ -200,7 +200,6 @@ Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) : P
     d2 ~= (x <- c ;; Ret (snd x)) /\
     |= c { fun '(x, y) => R x y }.
 
-  (* TODO make this work for parsing *)
 Notation "|= c ~ d { P }" := (coupling P c d) (at level 60, d at level 0, c at level 0, P at level 0).
 
 Lemma coupling_refl {A} (d : Dist A) : 
