@@ -207,7 +207,23 @@ Lemma coupling_refl {A} (d : Dist A) :
   |= d ~ d { eq }.
 Proof.
   unfold coupling.
-Admitted.
+  exists (x <- d;; (ret (x, x))).
+  split.
+  unfold eqDist.
+  intros.
+  rewrite evalDist_bind. rewrite evalDist_bind. simpl. reflexivity.
+  split.
+  unfold eqDist. intros.
+  rewrite evalDist_bind. rewrite evalDist_bind. simpl. reflexivity.
+  unfold valid.
+  intros.
+  destruct x.
+  induction d.
+  - simpl in H. inversion H; subst. reflexivity.
+  - simpl in H. destruct H.
+    + specialize (H0 false H). apply H0.
+    + specialize (H0 true H). apply H0.
+Qed.
 
 Lemma coupling_flip_opp :
   coupling (fun x y => x = negb y) flip flip.
