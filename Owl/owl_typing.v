@@ -521,8 +521,6 @@ Proof.
     clear Ht Hf Htr.
     destruct H.
     + rewrite H. simpl. 
-    
-     
 Admitted.
 
 Lemma exec_coin_Op :
