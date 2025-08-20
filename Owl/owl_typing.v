@@ -246,6 +246,7 @@ Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    | KSync K' => (sync (Plug K' t))
    end.
 
+
 Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   match e with
   | zero e =>
@@ -308,6 +309,55 @@ Axiom fresh_not_allocated :
   forall {l m} (memory : mem l m), memory (fresh memory) = None.
 
 (* General logic for non error reductions, and how they function *)
+
+Fixpoint extract_arguments (ts : list (tm 0 0)) : option (list binary) :=
+  None.
+
+Definition reduce (t : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
+  match t with 
+  | zero (bitstring b) => Some (Ret ((bitstring (generate_zero b)), m, st))
+  | Op f es => 
+    match extract_arguments es with 
+    | None => None
+    | Some bs => Some (x <- f bs ;; Ret (bitstring x, m, st)) end
+  | _ => None
+  end.
+
+Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
+  match c with 
+  | Ret x => k x
+  | Flip f => 
+    match uniform_bind (f false) k, uniform_bind (f true) k with 
+    | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
+    | _, _ => None end end.
+
+
+Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
+  match k with 
+  | 0 => if is_value_b e then Some (Ret (e, m, st)) else None
+  | S k' => 
+    if is_value_b e then Some (Ret (e, m, st))
+    else 
+    match decompose e with 
+    | None => None
+    | Some (K, r) => 
+        match reduce r m st with 
+        | None => None 
+        | Some D => 
+          uniform_bind D (fun '(e', m', s') => 
+            exec k' (Plug K e') m' s') end end end.
+
+
+(** TODO:
+  - Move uniform_bind into Dist.v
+  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose)
+  - Encoding the adversary
+  - Finish reduce; get rid of Inductive versions
+  - Do monotonicity lemma
+  - Well-bracketed lemma
+  *)
+
+
 Inductive tm_reduction : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop := 
 | r_zero : forall b memory s, 
   tm_reduction (zero (bitstring b), memory, s) (Ret ((bitstring (generate_zero b)), memory, s))
@@ -380,6 +430,23 @@ Inductive reduce : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binar
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
+
+(* General logic for evaluating a term down/performing steps of an execution *)
+Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
+| exec_return : forall k e m s,
+  is_value e \/ k = 0 ->
+  exec k (e, m, s) (ret (e, m, s))
+| exec_step : forall k K r m s D R,
+  reduce (r, m, s) D ->
+  exec_dist k K D R ->
+  exec (S k) (Plug K r, m, s) R
+with exec_dist : nat -> Kctx -> Dist (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
+| exec_dist_ret : forall k K c R,
+  exec k (plug_dist K c) R ->
+  exec_dist k K (Ret c) R
+| exec_dist_flip : forall k K f R,
+  (forall b, exec_dist k K (f b) (R b)) ->
+  exec_dist k K (Flip f) (Flip R). 
   
 (* General logic for evaluating a term down/performing steps of an execution *)
 (* C represents some sort of Exec function *)
