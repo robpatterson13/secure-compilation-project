@@ -231,17 +231,6 @@ Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    | KSync K' => (sync (Plug K' t))
    end.
 
-
-Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
-  match e with
-  | zero e =>
-      match decompose e with
-      | Some (K, r) => Some (ZeroK K, r)
-      | None => Some (KHole, zero e) 
-      end
-  | _ => None
-  end.
-
 (* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
   match b with
@@ -296,16 +285,59 @@ Axiom fresh_not_allocated :
 (* General logic for non error reductions, and how they function *)
 
 (* NEW STUFF TO WORK THROUGH *)
-Fixpoint extract_arguments (ts : list (tm 0 0)) : option (list binary) :=
-  None.
 
-Definition reduce (t : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
+Fixpoint extract_arguments (es : list (tm 0 0)) : option (list binary) :=
+  match es with
+  | [] => Some []
+  | bitstring b :: es' =>
+      match extract_arguments es' with
+      | Some bs => Some (b :: bs)
+      | None => None
+      end
+  | _ => None
+  end.
+
+Definition reduce (t : tm 0 0) (memory : mem 0 0) (s : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match t with 
-  | zero (bitstring b) => Some (Ret ((bitstring (generate_zero b)), m, st))
+  | zero (bitstring b) => Some (Ret ((bitstring (generate_zero b)), memory, s))
+  | if_tm (bitstring b) e1 e2 => if all_zero_b b then Some (Ret (e1, memory, s)) else Some (Ret (e2, memory, s))
+  | alloc v => if is_value_b v then (let res := (fresh memory) in Some (Ret (loc res, (allocate res v memory), s))) else None
+  | dealloc (loc n) => 
+    match memory n with
+    | None => None
+    | Some v => Some (Ret (v, memory, s))
+    end
+  | assign (loc n) v => if is_value_b v then Some (Ret (skip, (allocate n v memory), s)) else None
+  | Core.app (fixlam e) v => if is_value_b v then Some (Ret ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory, s)) else None
+  | left_tm (tm_pair v1 v2) => if andb (is_value_b v1) (is_value_b v2) then Some (Ret (v1, memory, s)) else None
+  | right_tm (tm_pair v1 v2) => if andb (is_value_b v1) (is_value_b v2) then Some (Ret (v2, memory, s)) else None
+  | case (inl v) e1 e2 => if is_value_b v then Some (Ret (subst_tm var_label(scons v var_tm) e1, memory, s)) else None
+  | case (inr v) e1 e2 => if is_value_b v then Some (Ret (subst_tm var_label (scons v var_tm) e2, memory, s)) else None
+  | tapp (tlam e) => Some (Ret (e, memory, s))
+  | lapp (l_lam e) lab => Some (Ret ((subst_tm (scons lab var_label) var_tm e), memory, s))
+  | unpack (pack v) e => if is_value_b v then Some (Ret (subst_tm var_label (scons v var_tm) e, memory, s)) else None
+  | if_c c e1 e2 => if valid_constraint_b c then Some (Ret (e1, memory, s)) else Some (Ret (e2, memory, s))
   | Op f es => 
     match extract_arguments es with 
     | None => None
-    | Some bs => Some (x <- f bs ;; Ret (bitstring x, m, st)) end
+    | Some bs => Some (x <- f bs ;; Ret (bitstring x, memory, s)) end
+  | _ => None
+  end.
+
+Lemma test_reduce : forall (memory : mem 0 0) s, 
+  reduce (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
+Proof.
+  intros.
+  simpl. reflexivity.
+Qed.
+
+Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
+  match e with
+  | zero e =>
+      match decompose e with
+      | Some (K, r) => Some (ZeroK K, r)
+      | None => Some (KHole, zero e) 
+      end
   | _ => None
   end.
 
@@ -342,77 +374,6 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
   - Do monotonicity lemma
   - Well-bracketed lemma
   *)
-
-
-Inductive tm_reduction : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop := 
-| r_zero : forall b memory s, 
-  tm_reduction (zero (bitstring b), memory, s) (Ret ((bitstring (generate_zero b)), memory, s))
-| r_ift : forall b e1 e2 memory s, 
-  all_zero b -> 
-  tm_reduction (if_tm (bitstring b) e1 e2, memory, s) (Ret (e1, memory, s))
-| r_iff : forall b e1 e2 memory s, 
-  (not (all_zero b)) -> 
-  tm_reduction (if_tm (bitstring b) e1 e2, memory, s) (Ret (e2, memory, s))
-| r_alloc : forall v memory s,
-  is_value v ->
-  let res := (fresh memory) in
-  tm_reduction (alloc v, memory, s) (Ret (loc res, (allocate res v memory), s))
-| r_deref : forall n memory v s,
-  memory n = Some v ->
-  tm_reduction (dealloc (loc n), memory, s) (Ret (v, memory, s))
-| r_assign : forall n v memory s,
-  is_value v ->
-  tm_reduction (assign (loc n) v, memory, s) (Ret (skip, (allocate n v memory), s))
-| r_fix : forall e v memory s,
-  is_value v ->
-  tm_reduction (Core.app (fixlam e) v, memory, s) (Ret ((subst_tm var_label (scons v (scons (fixlam e) var_tm)) e), memory, s))
-| r_pair_l : forall v1 v2 memory s,
-  is_value v1 ->
-  is_value v2 ->
-  tm_reduction (left_tm (tm_pair v1 v2), memory, s) (Ret (v1, memory, s))
-| r_pair_r : forall v1 v2 memory s,
-  is_value v1 ->
-  is_value v2 ->
-  tm_reduction (right_tm (tm_pair v1 v2), memory, s) (Ret (v2, memory, s))
-| r_case_l : forall v e1 e2 memory s,
-  is_value v ->
-  tm_reduction (case (inl v) e1 e2, memory, s) (Ret (subst_tm var_label(scons v var_tm) e1, memory, s))
-| r_case_r : forall v e1 e2 memory s,
-  is_value v ->
-  tm_reduction (case (inr v) e1 e2, memory, s) (Ret (subst_tm var_label (scons v var_tm) e2, memory, s))
-| r_tapp : forall e memory s,
-  tm_reduction (tapp (tlam e), memory, s) (Ret (e, memory, s))
-| r_lapp : forall e lab memory s,
-  tm_reduction (lapp (l_lam e) lab, memory, s) (Ret ((subst_tm (scons lab var_label) var_tm e), memory, s))
-| r_unpack : forall v e memory s,
-  is_value v ->
-  tm_reduction (unpack (pack v) e, memory, s) (Ret (subst_tm var_label (scons v var_tm) e, memory, s))
-| r_iflt : forall c e1 e2 memory s,
-  valid_constraint c ->
-  tm_reduction (if_c c e1 e2, memory, s) (Ret (e1, memory, s))
-| r_iflf : forall c e1 e2 memory s,
-  not (valid_constraint c) ->
-  tm_reduction (if_c c e1 e2, memory, s) (Ret (e2, memory, s))
-| r_op : forall f es bs memory s,
-  es = (map (convert_to_bitstring 0 0) bs) ->
-  tm_reduction ((Op f es), memory, s) (b <- (f bs);; (Ret (bitstring b, memory, s))).
-
-Check tm_reduction.
-
-(* To check if an evaluation is unable to continue/is malformed *)
-Definition stuck (v : tm 0 0) (memory : mem 0 0) (s : binary) :=
-  not (is_value v) /\
-      (forall (D : (Dist (tm 0 0 * mem 0 0 * binary))),
-        not (tm_reduction (v, memory, s) D)).
-
-(* Integrate stuck as a reducible result *)
-Inductive reduce : (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop := 
-| reduce_tm : forall A B,
-  tm_reduction A B ->
-  reduce A B
-| reduce_stuck : forall v memory s,
-  stuck v memory s ->
-  reduce (v, memory, s) (Ret (error, memory, s)).
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
