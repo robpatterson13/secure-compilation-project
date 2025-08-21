@@ -186,13 +186,13 @@ Inductive Kctx {l m : nat} :=
 | KHole : Kctx
 | ZeroK : Kctx -> Kctx
 | KAppL : Kctx -> tm l m -> Kctx
-| KAppR : forall (v : tm l m), is_value v -> Kctx -> Kctx
+| KAppR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
 | KAlloc : Kctx -> Kctx
 | KDeAlloc : Kctx -> Kctx
 | KAssignL : Kctx -> tm l m -> Kctx
-| KAssignR : forall (v : tm l m), is_value v -> Kctx -> Kctx
+| KAssignR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
 | KPairL : Kctx -> tm l m -> Kctx
-| KPairR : forall (v : tm l m), is_value v -> Kctx -> Kctx
+| KPairR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
 | KFst : Kctx -> Kctx
 | KSnd : Kctx -> Kctx
 | KInl : Kctx -> Kctx
@@ -258,7 +258,7 @@ Definition mem (l m : nat) := nat -> option (tm l m).
 
 (* Memory only contains value terms *)
 Definition only_values {l m} (memory : mem l m) : Prop :=
-  forall a t, memory a = Some t -> is_value t.
+  forall a t, memory a = Some t -> is_value_b t = true.
 
 Definition test_mem (l m : nat) : mem l m :=
   fun i =>
@@ -331,12 +331,34 @@ Proof.
   simpl. reflexivity.
 Qed.
 
+Definition is_value_dec {l m} (t : tm l m) : { is_value_b t = true } + { not (is_value_b t = true) }.
+Proof.
+  destruct (is_value_b t) eqn:Hb.
+  - left. reflexivity.
+  - right. simpl. discriminate.
+Qed.
+
 Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   match e with
   | zero e =>
       match decompose e with
-      | Some (K, r) => Some (ZeroK K, r)
       | None => Some (KHole, zero e) 
+      | Some (K, r) => Some (ZeroK K, r)
+      end
+  | Core.app e1 e2 => 
+    match decompose e1, decompose e2 with 
+    | Some (K, r), _ => Some (KAppL K e2, r)
+    | None, Some (K, r) => 
+      match is_value_dec e1 with
+      | left Hv => Some (KAppR e1 Hv K, r)
+      | right _ => None (* Technically an impossible case, but oh well *)
+      end
+    | _, _ => Some (KHole, Core.app e1 e2)
+    end
+  | if_tm v e1 e2 => 
+      match decompose v with
+      | None => Some (KHole, if_tm v e1 e2)
+      | Some (K, r) => Some (KIf K e1 e2, r)
       end
   | _ => None
   end.
