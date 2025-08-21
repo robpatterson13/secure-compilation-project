@@ -173,22 +173,7 @@ Fixpoint is_value_b {l m} (t : tm l m) : bool :=
   | inl v            => is_value_b v
   | inr v            => is_value_b v
   | pack v           => is_value_b v
-  | var_tm _         => false
-  | Op _ _           => false
-  | zero _           => false
-  | Core.app _ _          => false
-  | alloc _          => false
-  | dealloc _        => false
-  | assign _ _       => false
-  | left_tm _        => false
-  | right_tm _       => false
-  | case _ _ _       => false
-  | tapp _           => false
-  | lapp _ _         => false
-  | unpack _ _       => false
-  | if_tm _ _ _      => false
-  | if_c _ _ _       => false
-  | sync _           => false
+  | _ => false
   end.
 
 Inductive is_redex { l m } : tm l m -> Prop :=
