@@ -360,7 +360,17 @@ Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_
       + simpl. destruct (split_values es). simpl. simpl in IHes. constructor. assumption. assumption.
       + simpl. constructor.
 Qed.
-      
+
+Lemma Forall_snoc {A} (P : A -> Prop) xs x :
+  Forall P xs -> P x -> Forall P (xs ++ [x]).
+Proof.
+  induction xs.
+  - simpl. intros. constructor. assumption. assumption.
+  - simpl. intros. constructor. inversion H; subst. assumption. apply IHxs.
+    + inversion H; subst. apply H4.
+    + apply H0.
+Qed.
+
 Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   match e with
   | zero e =>
@@ -464,15 +474,6 @@ Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
       | None => Some (KHole, sync e)
       | Some (K, r) => Some (KSync K, r)
       end
-  | Op f es => 
-      match snd (split_values es) with 
-      | [] => Some (KHole, Op f es)
-      | e :: es' => 
-          match decompose e with
-          | Some (K, r) => Some (KOp f (fst (split_values es)) K es' (is_value_list es), r) 
-          | None => None
-          end
-      end
   | _ => None
   end.
 
@@ -501,6 +502,8 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
             exec k' (Plug K e') m' s') end end end.
 
 
+
+
 (** TODO:
   - Move uniform_bind into Dist.v
   - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose)
@@ -512,66 +515,6 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
-
-(* General logic for evaluating a term down/performing steps of an execution *)
-Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
-| exec_return : forall k e m s,
-  is_value e \/ k = 0 ->
-  exec k (e, m, s) (ret (e, m, s))
-| exec_step : forall k K r m s D R,
-  reduce (r, m, s) D ->
-  exec_dist k K D R ->
-  exec (S k) (Plug K r, m, s) R
-with exec_dist : nat -> Kctx -> Dist (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
-| exec_dist_ret : forall k K c R,
-  exec k (plug_dist K c) R ->
-  exec_dist k K (Ret c) R
-| exec_dist_flip : forall k K f R,
-  (forall b, exec_dist k K (f b) (R b)) ->
-  exec_dist k K (Flip f) (Flip R). 
-  
-(* General logic for evaluating a term down/performing steps of an execution *)
-(* C represents some sort of Exec function *)
-Inductive exec : nat -> (tm 0 0 * mem 0 0 * binary) -> Dist (tm 0 0 * mem 0 0 * binary) -> Prop :=
-| exec_return : forall k e m s,
-  is_value e \/ k = 0 ->
-  exec k (e, m, s) (ret (e, m, s))
-| exec_step :
-    forall k K r m s D C,
-      reduce (r, m, s) D ->
-      (forall c, inSupport D c -> exec k (plug_dist K c) (C c)) ->
-      exec (S k) (Plug K r, m, s) (c <- D ;; C c).
-
-(* Potentially useful supporting lemma for Return dists *)
-Lemma exec_step_ret : forall k K r m s c R,
-  reduce (r, m, s) (Ret c) ->
-  exec k (plug_dist K c) R ->
-  exec (S k) (Plug K r, m, s) R.
-Proof.
-  intros.
-  specialize (exec_step k K r m s (ret c) (fun x => R) H) as Hs.
-  simpl in Hs. apply Hs.
-  intros.
-  unfold inSupport in H1. rewrite H1. assumption.  
-Qed.
-
-(* Potentially useful supporting lemma for Flip dists *)
-Lemma exec_step_flip :
-  forall k K r m s f C,
-    reduce (r,m,s) (Flip f) ->
-    (forall b c, inSupport (f b) c ->
-                 exec k (plug_dist K c) (C c)) ->
-    exec (S k) (Plug K r, m, s)
-         (Flip (fun b => (c <- f b ;; C c))).
-Proof.
-  intros. 
-  specialize (exec_step k K r m s (Flip f) C H) as He.
-  apply He.
-  intros. simpl in H1.
-  destruct H1.
-  - specialize (H0 false c H1) as Hw. apply Hw.
-  - specialize (H0 true c H1) as Hw. apply Hw.
-Qed.
 
 (* Sample Coin Flip Op *)
 Definition coin_flip : op :=
@@ -621,167 +564,32 @@ Definition coin_Op : tm 0 0 := (Op coin_flip []).
 
 Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))]).
 
-Definition C_zero (c : tm 0 0 * mem 0 0 * binary) : Dist (tm 0 0 * mem 0 0 * binary) :=
-  match c with
-  | (bitstring b, m', s') => ret (bitstring (generate_zero b), m', s')
-  | (e, m', s')  => ret (e, m', s') 
-  end.
-
-Lemma exec_coin_Op_plus :
-  forall (memory : mem 0 0) s,
-    exec 10 ((zero coin_Op_plus), memory, s)
-             (Flip (fun b =>
-                      ret (bitstring (if b then (bzero (bzero bend)) else bzero bend), memory, s))).
-Proof.
-  intros.
-  assert ((Plug (ZeroK KHole) coin_Op_plus) = (zero coin_Op_plus)) as Ht. {
-    simpl. reflexivity.
-  }
-  rewrite <- Ht. 
-  specialize (exec_step 9 (ZeroK KHole) coin_Op_plus memory s) as Hf.
-  specialize (Hf (Flip (fun b => ret (bitstring (if b then (bone (bone bend)) else bone bend), memory, s)))).
-  simpl in Hf.
-  specialize (Hf C_zero).
-  simpl in Hf.
-  assert ((fun x : bool =>
-           ret (@bitstring 0 0 (generate_zero (if x then bone (bone bend) else bone bend)), memory, s)) = 
-          (fun b : bool => 
-           ret (bitstring (if b then bzero (bzero bend) else bzero bend), memory, s))) as Htr.
-  {
-    simpl.
-    apply functional_extensionality. destruct x.
-    - simpl. reflexivity.
-    - simpl. reflexivity. 
-  }
-  rewrite Htr in Hf. 
-  apply Hf.
-  - specialize (r_op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))] [(bone (bone bend)) ; (bone bend)]) as Hp.
-    specialize (Hp memory s).
-    assert ([bitstring (bone (bone bend)); bitstring (bone bend)] =
-     list_map (convert_to_bitstring 0 0) [bone (bone bend); bone bend]) as Heq.
-     {
-      reflexivity.
-     }
-    specialize (Hp Heq). simpl in Hp.
-    apply reduce_tm in Hp.
-    unfold coin_Op_plus.
-    apply Hp.
-  - intros.
-    clear Ht Hf Htr.
-    destruct H.
-    + rewrite H. simpl. 
-Admitted.
-
-Lemma exec_coin_Op :
-  forall (memory : mem 0 0) s,
-    exec 10 (Op coin_flip [], memory, s)
-             (Flip (fun b =>
-                      ret (bitstring (if b then bone bend else bzero bend), memory, s))).
-Proof.
-  intros.
-  assert ((Plug KHole (Op coin_flip [])) = Op coin_flip []) as Ht. {
-    simpl. reflexivity.
-  }
-  rewrite <- Ht.
-  specialize (exec_step_flip 9 KHole (Op coin_flip []) memory s) as Hf.
-  specialize (Hf (fun b => ret (bitstring (if b then bone bend else bzero bend), memory, s))).
-  simpl in Hf.
-  specialize (Hf (fun x => (ret x))).
-  simpl in Hf.
-  specialize (r_op coin_flip [] [] memory s) as Ho. simpl in Ho.
-  assert (forall (lst : list (tm 0 0)), lst = lst) as free. {
-    intros.
-    reflexivity.
-  }
-  specialize (Ho (free [])).
-  specialize (reduce_tm (Op coin_flip [], memory, s) (Flip (fun x : bool => ret (bitstring (if x then bone bend else bzero bend), memory, s)))) as Hr.
-  specialize (Hr Ho).
-  specialize (Hf Hr).
-  specialize (Hf).
-  apply Hf. intros.
-  inversion H; subst. simpl.
-  constructor. left. constructor.
-Qed.
-
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma test_exec :
   forall (memory : mem 0 0) s,
-    exec 10 ((zero (bitstring (bone (bone bend)))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s)).
+    exec 10 (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
   intros.
-  Check zero (bitstring (bone (bone bend))).
-  assert ((Plug KHole (zero (bitstring (bone (bone bend))))) = (zero (bitstring (bone (bone bend))))) as Ht. {
-    simpl. reflexivity.
-  }
-  rewrite <- Ht.
-  specialize (exec_step_ret 9 KHole (zero (bitstring (bone (bone bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s)) as Hn.
-  simpl in Hn.
-  specialize (Hn (ret ((bitstring (bzero (bzero bend))), memory, s))).
-  simpl in Hn.
-  specialize (r_zero (bone (bone bend)) memory s) as Hx. simpl in Hx.
-  specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret (bitstring (bzero (bzero bend)), memory, s)) Hx) as Hr.
-  specialize (Hn Hr). simpl.
-  apply Hn.
-  constructor. 
-  left.
-  constructor.
+  simpl. 
+  reflexivity.
 Qed.
 
 Lemma test_exec_2 :
   forall (memory : mem 0 0) s,
-    exec 10 ((zero (zero (bitstring (bone (bone bend))))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s)).
+    exec 10 (zero (zero (bitstring (bone (bone bend))))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
-  (* Exec Step 1 *)
   intros.
-  assert ((Plug (ZeroK KHole) (zero (bitstring (bone (bone bend))))) = (zero (zero (bitstring (bone (bone bend)))))) as Ht. {
-    simpl. reflexivity.
-  }
-  rewrite <- Ht. 
-  specialize (exec_step_ret 9 (ZeroK KHole) (zero (bitstring (bone (bone bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s) (ret ((bitstring (bzero (bzero bend))), memory, s))) as Hes.
-  simpl in Hes.
-  specialize (r_zero (bone (bone bend)) memory s) as Hx.
-  specialize (reduce_tm (zero (bitstring (bone (bone bend))), memory, s) (ret(bitstring (bzero (bzero bend)), memory, s))) as Hr.
-  specialize (Hr Hx).
-  specialize (Hes Hr).
   simpl.
-  apply Hes.
-  (* Exec Step 2 *)
-  simpl.
-  clear Hr Hx Hes Ht. 
-  assert ((Plug KHole (zero (bitstring (bzero (bzero bend))))) = (zero (bitstring (bzero (bzero bend))))) as Ht. {
-    simpl. reflexivity.
-  }
-  specialize (exec_step_ret 8 KHole (zero (bitstring (bzero (bzero bend)))) memory s ((bitstring (bzero (bzero bend))), memory, s)) as Hs.
-  specialize (Hs (ret ((bitstring (bzero (bzero bend))), memory, s))).
-  specialize (r_zero (bzero (bzero bend)) memory s) as Hz.
-  specialize (reduce_tm (zero (bitstring (bzero (bzero bend))), memory, s) (ret (bitstring (generate_zero (bzero (bzero bend))), memory, s)) Hz) as Hr.
-  specialize (Hs Hr). 
-  apply Hs.
-  constructor.
-  left.
-  constructor.
+  reflexivity.
 Qed.
   
 Lemma test_error :
   forall (memory : mem 0 0) s,
-    exec 5 (zero skip, memory, s) (ret (error, memory, s)).
+    exec 5 (zero skip) memory s = None.
 Proof.
   intros.
-  assert (stuck (zero skip) memory s) as Hs. {
-    unfold stuck.
-    split.
-    - intros H. inversion H.
-    - intros. intro H. inversion H. 
-  }
-  specialize (reduce_stuck (zero skip) memory s Hs) as Hr.
-  specialize (exec_step_ret 4 KHole (zero skip) memory s (error, memory, s)) as Hx.
-  simpl in Hx.
-  specialize (Hx (ret (error, memory, s))). simpl in Hx.
-  specialize (Hx Hr).
-  apply Hx.
-  constructor.
-  left.
-  constructor.
+  simpl.
+  reflexivity.
 Qed.
 
 (* Complete subtyping next, minus the material about ops... probablity later or maybe right now *)
