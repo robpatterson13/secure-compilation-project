@@ -203,7 +203,9 @@ Inductive Kctx {l m : nat} :=
 | KPack : Kctx -> Kctx
 | KUnpack : Kctx -> tm l (S m) -> Kctx
 | KIf : Kctx -> tm l m -> tm l m -> Kctx
-| KSync : Kctx -> Kctx.
+| KSync : Kctx -> Kctx
+| KOp : forall (f : op) (vs : list (tm l m)) (K  : Kctx) (es : list (tm l m)),          
+            Forall (fun v => is_value_b v = true) vs -> Kctx.
 
 (* Plug a term into the expression context K to get a resulting term *)
 Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
@@ -229,7 +231,19 @@ Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
    | KUnpack  K' e => (unpack (Plug K' t) e)
    | KIf K' e1 e2 => (if_tm (Plug K' t) e1 e2)
    | KSync K' => (sync (Plug K' t))
+   | KOp f vs K' es _ => Op f (vs ++ Plug K' t :: es)
    end.
+
+Fixpoint split_values {l m}
+         (xs : list (tm l m))
+  : list (tm l m) * list (tm l m) :=
+  match xs with
+  | [] => ([], [])
+  | x :: xs' =>
+      if is_value_b x
+      then let (vs, es) := split_values xs' in (x :: vs, es)
+      else ([], xs)
+  end.
 
 (* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
@@ -338,6 +352,15 @@ Proof.
   - right. simpl. discriminate.
 Qed.
 
+Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_b v = true) (fst (split_values es)).
+  Proof.
+    induction es.
+    - simpl. constructor.
+    - simpl. destruct (is_value_b a) eqn:Ha. 
+      + simpl. destruct (split_values es). simpl. simpl in IHes. constructor. assumption. assumption.
+      + simpl. constructor.
+Qed.
+      
 Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   match e with
   | zero e =>
@@ -355,10 +378,100 @@ Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
       end
     | _, _ => Some (KHole, Core.app e1 e2)
     end
+  | alloc v => 
+      match decompose v with
+      | None => Some (KHole, alloc v) 
+      | Some (K, r) => Some (KAlloc K, r)
+      end
+  | dealloc v =>
+      match decompose v with
+      | None => Some (KHole, dealloc v) 
+      | Some (K, r) => Some (KDeAlloc K, r)
+      end
+  | assign e1 e2 =>
+      match decompose e1, decompose e2 with
+      | Some (K, r), _ => Some (KAssignL K e2, r)
+      | None, Some (K, r) => 
+        match is_value_dec e1 with
+        | left Hv => Some (KAssignR e1 Hv K, r)
+        | right _ => None
+        end
+      | _, _ => Some (KHole, assign e1 e2)
+      end
+  | tm_pair e1 e2 => 
+      match decompose e1, decompose e2 with
+      | Some (K, r), _ => Some (KPairL K e2, r)
+      | None, Some (K, r) => 
+        match is_value_dec e1 with
+        | left Hv => Some (KPairR e1 Hv K, r)
+        | right _ => None
+        end
+      | _, _ => None
+      end
+  | left_tm e =>
+      match decompose e with 
+      | Some (K, r) => Some (KFst K, r)
+      | None => Some (KHole, left_tm e)
+      end
+  | right_tm e => 
+      match decompose e with 
+      | Some (K, r) => Some (KSnd K, r)
+      | None => Some (KHole, right_tm e)
+      end
+  | inl e => 
+      match decompose e with
+      | Some (K, r) => Some (KInl K, r)
+      | None => None
+      end
+  | inr e => 
+      match decompose e with
+      | Some (K, r) => Some (KInR K, r)
+      | None => None
+      end
+  | case e0 e1 e2 =>
+      match decompose e0 with
+      | None => Some (KHole, case e0 e1 e2)
+      | Some (K, r) => Some (KCase K e1 e2, r)
+      end
+  | tapp e =>
+      match decompose e with
+      | None => Some (KHole, tapp e)
+      | Some (K, r) => Some (KTapp K, r)
+      end
+  | lapp e lab => 
+      match decompose e with
+      | None => Some (KHole, lapp e lab)
+      | Some (K, r) => Some (KLapp K lab, r)
+      end
+  | pack e => 
+      match decompose e with
+      | None => None
+      | Some (K, r) => Some (KPack K, r)
+      end
+  | unpack e1 e2 =>
+      match decompose e1 with
+      | None => Some (KHole, unpack e1 e2)
+      | Some (K, r) => Some (KUnpack K e2, r)
+      end   
   | if_tm v e1 e2 => 
       match decompose v with
       | None => Some (KHole, if_tm v e1 e2)
       | Some (K, r) => Some (KIf K e1 e2, r)
+      end
+  | if_c c e1 e2 => Some (KHole, if_c c e1 e2)
+  | sync e =>
+      match decompose e with 
+      | None => Some (KHole, sync e)
+      | Some (K, r) => Some (KSync K, r)
+      end
+  | Op f es => 
+      match snd (split_values es) with 
+      | [] => Some (KHole, Op f es)
+      | e :: es' => 
+          match decompose e with
+          | Some (K, r) => Some (KOp f (fst (split_values es)) K es' (is_value_list es), r) 
+          | None => None
+          end
       end
   | _ => None
   end.
