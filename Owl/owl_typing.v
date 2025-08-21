@@ -295,6 +295,7 @@ Axiom fresh_not_allocated :
 
 (* General logic for non error reductions, and how they function *)
 
+(* NEW STUFF TO WORK THROUGH *)
 Fixpoint extract_arguments (ts : list (tm 0 0)) : option (list binary) :=
   None.
 
