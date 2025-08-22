@@ -361,7 +361,7 @@ Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_
       + simpl. constructor.
 Qed.
 
-Lemma Forall_snoc {A} (P : A -> Prop) xs x :
+Lemma list_add_preserves {A} (P : A -> Prop) xs x :
   Forall P xs -> P x -> Forall P (xs ++ [x]).
 Proof.
   induction xs.
@@ -474,6 +474,20 @@ Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
       | None => Some (KHole, sync e)
       | Some (K, r) => Some (KSync K, r)
       end
+  | Op f es =>
+    let fix scan vs xs : option (Kctx * tm 0 0) :=
+        match xs with
+        | [] => Some (KHole, Op f vs)
+        | a :: xs' =>
+            if is_value_b a
+            then scan (vs ++ [a]) xs'
+            else
+              match decompose a with
+              | Some (K, r) => Some (KOp f (fst (split_values es)) K xs' (is_value_list es), r)
+              | None => None
+              end
+        end
+    in scan [] es
   | _ => None
   end.
 
@@ -500,9 +514,6 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
         | Some D => 
           uniform_bind D (fun '(e', m', s') => 
             exec k' (Plug K e') m' s') end end end.
-
-
-
 
 (** TODO:
   - Move uniform_bind into Dist.v
@@ -565,6 +576,31 @@ Definition coin_Op : tm 0 0 := (Op coin_flip []).
 Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))]).
 
 (* Test step/execute lemmas to see if we're in the correct place *)
+Lemma coin_test : forall memory s,
+  exec 100 coin_Op memory s = Some (Flip (fun b => ret (bitstring (if b then bone bend else bzero bend), memory, s))).
+Proof.
+  intros.
+  simpl.
+  repeat (apply f_equal).
+  apply functional_extensionality.
+  intros.
+  destruct x; reflexivity.
+Qed.
+
+Lemma exec_coin_Op_plus :
+  forall (memory : mem 0 0) s,
+    exec 10 (zero coin_Op_plus) memory s = Some
+             (Flip (fun b =>
+                      ret (bitstring (if b then (bzero (bzero bend)) else bzero bend), memory, s))).
+Proof.
+  intros.
+  simpl.
+  apply f_equal.
+  apply f_equal.
+  apply functional_extensionality.
+  destruct x; reflexivity.
+Qed.
+
 Lemma test_exec :
   forall (memory : mem 0 0) s,
     exec 10 (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
