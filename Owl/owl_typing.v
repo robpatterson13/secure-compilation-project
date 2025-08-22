@@ -361,16 +361,6 @@ Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_
       + simpl. constructor.
 Qed.
 
-Lemma list_add_preserves {A} (P : A -> Prop) xs x :
-  Forall P xs -> P x -> Forall P (xs ++ [x]).
-Proof.
-  induction xs.
-  - simpl. intros. constructor. assumption. assumption.
-  - simpl. intros. constructor. inversion H; subst. assumption. apply IHxs.
-    + inversion H; subst. apply H4.
-    + apply H0.
-Qed.
-
 Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   match e with
   | zero e =>
