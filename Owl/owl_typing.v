@@ -533,6 +533,8 @@ Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (
     | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
     | _, _ => None end end.
 
+Notation "x <-? c1 ;; c2" := (uniform_bind c1 (fun x => c2))
+  (at level 100, c1 at next level, right associativity).
 
 Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match k with 
@@ -549,9 +551,86 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
           uniform_bind D (fun '(e', m', s') => 
             exec k' (Plug K e') m' s') end end end.
 
+Lemma eq_decompose : forall e K r,
+  decompose e = Some (K, r) ->
+  e = (Plug K r).
+Proof.
+  intros.
+  dependent induction e; try inversion H; subst.
+  - admit.
+  - destruct (decompose e) eqn:He in H1. destruct p.
+    + inversion H1; subst. specialize (IHe e eq_refl eq_refl).
+      assert (e ~= e) as E. {
+        reflexivity.
+      }
+      specialize (IHe E k r He). rewrite IHe. simpl. reflexivity.
+    + inversion H1; subst. simpl. reflexivity.
+Admitted.   
+
+Lemma uniform_bind_congr {A B}
+      (c : Dist A) (f g : A -> option (Dist B)) d :
+  (forall a d', f a = Some d' -> g a = Some d') ->
+  uniform_bind c f = Some d ->
+  uniform_bind c g = Some d.
+Proof.
+Admitted.
+
+Require Import Lia.
+
+
+Lemma exec_monotonicity : forall k k' e memory s D,
+  exec k e memory s = Some D ->
+  k' >= k ->
+  exec k' e memory s = Some D.
+Proof.
+  intros.
+  induction k.
+  - inversion H; subst. destruct (is_value_b e) eqn:Hv.
+    + rewrite <- H2 in H. unfold exec. inversion H0; subst.
+      * rewrite Hv. reflexivity.
+      * rewrite Hv. reflexivity.
+    + inversion H2.
+  - specialize unique_decomposition as Hud.
+    specialize (Hud e). destruct Hud.
+    + destruct H1. unfold exec. inversion H0; subst.
+      * rewrite H1. inversion H; subst. rewrite H1 in H4. rewrite H1. rewrite H4. reflexivity.
+      * rewrite H1. inversion H; subst. rewrite H1 in H5. rewrite H1. reflexivity.
+    + destruct H1. destruct H2. destruct H2. specialize (eq_decompose e x x0 H2) as Hd. specialize H as H'.
+      unfold exec in H. rewrite H1 in H. rewrite H2 in H. destruct (reduce x0 memory s).
+      * simpl in H. fold exec in H. 
+        induction k'. inversion H0.
+        assert ((pat <-? d;;
+                  (let
+                    '(p, s') := pat in let '(e', m') := p in exec k (Plug x e') m' s')) = 
+                (pat <-? d;;
+                  (let
+                    '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s'))) as Hz. {
+                      specialize (uniform_bind_congr d (fun z => (let '(p, s') := z in let '(e', m') := p in exec k (Plug x e') m' s'))) as Hu.
+                      specialize (Hu (fun z => (let '(p, s') := z in let '(e', m') := p in exec k' (Plug x e') m' s'))).
+                      specialize (Hu D). 
+                      assert ((forall (a : tm 0 0 * mem 0 0 * binary) (d' : Dist (tm 0 0 * mem 0 0 * binary)),
+                                (fun '(p, s') => let '(e', m') := p in exec k (Plug x e') m' s') a = Some d' ->
+                                (fun '(p, s') => let '(e', m') := p in exec k' (Plug x e') m' s') a = Some d')) as Hz. {
+                                  intros.
+                                  assert (k' >= k) as Hge. {
+                                    lia.
+                                  }
+                                  
+
+                                }
+                    }  
+      * inversion H.  
+
+Lemma well_bracketed : forall k K e memory s D D',
+  exec (S k) (Plug K e) memory s = Some D ->
+  exec k e memory s = Some D' -> 
+  (e_mem <-? D';; (exec k (Plug K (fst (fst e_mem))) (snd (fst e_mem)) (snd e_mem))) = Some D.
+Proof.
+Admitted.
+
 (** TODO:
   - Move uniform_bind into Dist.v TBD
-  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) 1/2 Done
+  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) 1.5/2 Done
   - Encoding the adversary TBD
   - Finish reduce; get rid of Inductive versions DONE
   - Do monotonicity lemma TBD
