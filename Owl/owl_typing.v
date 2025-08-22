@@ -176,6 +176,12 @@ Fixpoint is_value_b {l m} (t : tm l m) : bool :=
   | _ => false
   end.
 
+Definition is_value_or_var_b {l m} (t : tm l m) : bool :=
+  match t with
+  | var_tm _  => true
+  | _ => (is_value_b t)
+  end.
+
 Inductive is_redex { l m } : tm l m -> Prop :=
 | zero_redex : forall v,
   is_value v ->
@@ -208,7 +214,7 @@ Inductive Kctx {l m : nat} :=
             Forall (fun v => is_value_b v = true) vs -> Kctx.
 
 (* Plug a term into the expression context K to get a resulting term *)
-Fixpoint Plug (K : Kctx) (t : tm 0 0) : (tm 0 0) :=
+Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
    match K with
    | KHole => t 
    | ZeroK K' => zero (Plug K' t)
@@ -361,7 +367,9 @@ Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_
       + simpl. constructor.
 Qed.
 
-Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
+Require Import Coq.Program.Equality.
+
+Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
   match e with
   | zero e =>
       match decompose e with
@@ -481,6 +489,42 @@ Fixpoint decompose (e : tm 0 0) : option (@Kctx 0 0 * tm 0 0) :=
   | _ => None
   end.
 
+(* Lemma 1 for decompose *)
+Lemma unique_decomposition : forall (e : tm 0 0),
+  (is_value_b e = true /\ decompose e = None) \/
+    (is_value_b e = false /\
+       exists (K : @Kctx 0 0) (r : tm 0 0),
+         decompose e = Some (K, r)).
+Proof.
+  intros.
+  dependent induction e; try (simpl; left; split; reflexivity; reflexivity).
+  - destruct f.
+  - simpl. right. split. reflexivity. admit.
+  - simpl. right. split. reflexivity. destruct (decompose e).
+    + destruct p. exists (ZeroK k). exists t. reflexivity.
+    + exists KHole. exists (zero e). simpl. reflexivity.
+  - simpl. right. split. reflexivity. destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
+    + destruct p. exists (KAppL k e2). exists t. reflexivity.
+    + destruct p. exists (KAppL k e2). exists t. reflexivity.
+    + destruct p. specialize (IHe1 e1 eq_refl eq_refl). destruct IHe1.
+      * reflexivity.
+      * destruct H. destruct (is_value_dec e1).
+      {
+       exists (KAppR e1 e k). exists t. reflexivity. 
+      }
+      {
+       rewrite H in n. destruct n. reflexivity.  
+      }
+      * destruct H. destruct (is_value_dec e1).
+        {
+         exists (KAppR e1 e k). exists t. reflexivity.  
+        }
+        {
+         rewrite He1 in H0. assumption.
+        }
+    + exists KHole. exists (Core.app e1 e2). reflexivity.
+Admitted.
+
 Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
   match c with 
   | Ret x => k x
@@ -506,12 +550,12 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
             exec k' (Plug K e') m' s') end end end.
 
 (** TODO:
-  - Move uniform_bind into Dist.v
-  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose)
-  - Encoding the adversary
-  - Finish reduce; get rid of Inductive versions
-  - Do monotonicity lemma
-  - Well-bracketed lemma
+  - Move uniform_bind into Dist.v TBD
+  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) 1/2 Done
+  - Encoding the adversary TBD
+  - Finish reduce; get rid of Inductive versions DONE
+  - Do monotonicity lemma TBD
+  - Well-bracketed lemma TBD
   *)
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
