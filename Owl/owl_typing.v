@@ -192,13 +192,13 @@ Inductive Kctx {l m : nat} :=
 | KHole : Kctx
 | ZeroK : Kctx -> Kctx
 | KAppL : Kctx -> tm l m -> Kctx
-| KAppR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
+| KAppR : tm l m -> Kctx -> Kctx
 | KAlloc : Kctx -> Kctx
 | KDeAlloc : Kctx -> Kctx
 | KAssignL : Kctx -> tm l m -> Kctx
-| KAssignR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
+| KAssignR : tm l m -> Kctx -> Kctx
 | KPairL : Kctx -> tm l m -> Kctx
-| KPairR : forall (v : tm l m), is_value_b v = true -> Kctx -> Kctx
+| KPairR : tm l m  -> Kctx -> Kctx
 | KFst : Kctx -> Kctx
 | KSnd : Kctx -> Kctx
 | KInl : Kctx -> Kctx
@@ -210,8 +210,7 @@ Inductive Kctx {l m : nat} :=
 | KUnpack : Kctx -> tm l (S m) -> Kctx
 | KIf : Kctx -> tm l m -> tm l m -> Kctx
 | KSync : Kctx -> Kctx
-| KOp : forall (f : op) (vs : list (tm l m)) (K  : Kctx) (es : list (tm l m)),          
-            Forall (fun v => is_value_b v = true) vs -> Kctx.
+| KOp : op -> list (tm l m) -> Kctx -> list (tm l m) -> Kctx.
 
 (* Plug a term into the expression context K to get a resulting term *)
 Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
@@ -219,13 +218,13 @@ Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
    | KHole => t 
    | ZeroK K' => zero (Plug K' t)
    | KAppL K' e => (Core.app (Plug K' t) e)
-   | KAppR  v _ K' => (Core.app v (Plug K' t))
+   | KAppR  v K' => (Core.app v (Plug K' t))
    | KAlloc K' => (alloc (Plug K' t))
    | KDeAlloc K' => (dealloc (Plug K' t))
    | KAssignL K' e => (assign (Plug K' t) e)
-   | KAssignR  v _ K' => (assign v (Plug K' t))
+   | KAssignR v K' => (assign v (Plug K' t))
    | KPairL K' e => (tm_pair (Plug K' t) e)
-   | KPairR  v _ K' => (tm_pair v (Plug K' t))
+   | KPairR  v K' => (tm_pair v (Plug K' t))
    | KFst K' => (left_tm (Plug K' t))
    | KSnd K' => (right_tm (Plug K' t))
    | KInl K' => (inl (Plug K' t))
@@ -237,7 +236,7 @@ Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
    | KUnpack  K' e => (unpack (Plug K' t) e)
    | KIf K' e1 e2 => (if_tm (Plug K' t) e1 e2)
    | KSync K' => (sync (Plug K' t))
-   | KOp f vs K' es _ => Op f (vs ++ Plug K' t :: es)
+   | KOp f vs K' es => Op f (vs ++ Plug K' t :: es)
    end.
 
 Fixpoint split_values {l m}
@@ -379,11 +378,7 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
   | Core.app e1 e2 => 
     match decompose e1, decompose e2 with 
     | Some (K, r), _ => Some (KAppL K e2, r)
-    | None, Some (K, r) => 
-      match is_value_dec e1 with
-      | left Hv => Some (KAppR e1 Hv K, r)
-      | right _ => None (* Technically an impossible case, but oh well *)
-      end
+    | None, Some (K, r) => Some (KAppR e1 K, r)
     | _, _ => Some (KHole, Core.app e1 e2)
     end
   | alloc v => 
@@ -399,21 +394,13 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
   | assign e1 e2 =>
       match decompose e1, decompose e2 with
       | Some (K, r), _ => Some (KAssignL K e2, r)
-      | None, Some (K, r) => 
-        match is_value_dec e1 with
-        | left Hv => Some (KAssignR e1 Hv K, r)
-        | right _ => None
-        end
+      | None, Some (K, r) => Some (KAssignR e1 K, r)
       | _, _ => Some (KHole, assign e1 e2)
       end
   | tm_pair e1 e2 => 
       match decompose e1, decompose e2 with
       | Some (K, r), _ => Some (KPairL K e2, r)
-      | None, Some (K, r) => 
-        match is_value_dec e1 with
-        | left Hv => Some (KPairR e1 Hv K, r)
-        | right _ => None
-        end
+      | None, Some (K, r) => Some (KPairR e1 K, r)
       | _, _ => None
       end
   | left_tm e =>
@@ -473,21 +460,49 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
       | Some (K, r) => Some (KSync K, r)
       end
   | Op f es =>
-    let fix scan vs xs : option (Kctx * tm 0 0) :=
+    let fix scan f vs xs : option (Kctx * tm 0 0) :=
         match xs with
         | [] => Some (KHole, Op f vs)
         | a :: xs' =>
             if is_value_b a
-            then scan (vs ++ [a]) xs'
+            then scan f (vs ++ [a]) xs'
             else
               match decompose a with
-              | Some (K, r) => Some (KOp f (fst (split_values es)) K xs' (is_value_list es), r)
+              | Some (K, r) => Some (KOp f vs K xs', r)
               | None => None
               end
         end
-    in scan [] es
+    in scan f [] es
   | _ => None
   end.
+
+(* Peace of mind for later on *)
+Inductive wfKctx {l m} : Kctx -> Prop :=
+| wfKHole : wfKctx (@KHole l m)
+| wfZero  K      : wfKctx K -> wfKctx (ZeroK K)
+| wfAppL  K e    : wfKctx K -> wfKctx (KAppL K e)
+| wfAppR  v K    : wfKctx K -> is_value_b v = true -> wfKctx (KAppR v K)
+| wfAlloc K      : wfKctx K -> wfKctx (KAlloc K)
+| wfDeAlloc K    : wfKctx K -> wfKctx (KDeAlloc K)
+| wfAssignL K e  : wfKctx K -> wfKctx (KAssignL K e)
+| wfAssignR v K  : wfKctx K -> is_value_b v = true -> wfKctx (KAssignR v K)
+| wfPairL  K e   : wfKctx K -> wfKctx (KPairL K e)
+| wfPairR  v K   : wfKctx K -> is_value_b v = true -> wfKctx (KPairR v K)
+| wfFst    K     : wfKctx K -> wfKctx (KFst K)
+| wfSnd    K     : wfKctx K -> wfKctx (KSnd K)
+| wfInl    K     : wfKctx K -> wfKctx (KInl K)
+| wfInR    K     : wfKctx K -> wfKctx (KInR K)
+| wfCase   K e1 e2 : wfKctx K -> wfKctx (KCase K e1 e2)
+| wfTapp   K     : wfKctx K -> wfKctx (KTapp K)
+| wfLapp   K lab : wfKctx K -> wfKctx (KLapp K lab)
+| wfPack   K     : wfKctx K -> wfKctx (KPack K)
+| wfUnpack K e   : wfKctx K -> wfKctx (KUnpack K e)
+| wfIf     K e1 e2 : wfKctx K -> wfKctx (KIf K e1 e2)
+| wfSync   K     : wfKctx K -> wfKctx (KSync K)
+| wfOp     f vs K es
+    : wfKctx K
+    -> Forall (fun v => is_value_b v = true) vs
+    -> wfKctx (KOp f vs K es).
 
 (* Lemma 1 for decompose *)
 Lemma unique_decomposition : forall (e : tm 0 0),
@@ -499,7 +514,9 @@ Proof.
   intros.
   dependent induction e; try (simpl; left; split; reflexivity; reflexivity).
   - destruct f.
-  - simpl. right. split. reflexivity. admit.
+  - simpl. right. split. reflexivity. induction l.
+    + exists KHole, (Op o []). reflexivity.
+    + simpl. destruct (is_value_b a) eqn:Hb. simpl. admit. admit.
   - simpl. right. split. reflexivity. destruct (decompose e).
     + destruct p. exists (ZeroK k). exists t. reflexivity.
     + exists KHole. exists (zero e). simpl. reflexivity.
@@ -508,22 +525,69 @@ Proof.
     + destruct p. exists (KAppL k e2). exists t. reflexivity.
     + destruct p. specialize (IHe1 e1 eq_refl eq_refl). destruct IHe1.
       * reflexivity.
-      * destruct H. destruct (is_value_dec e1).
-      {
-       exists (KAppR e1 e k). exists t. reflexivity. 
-      }
-      {
-       rewrite H in n. destruct n. reflexivity.  
-      }
-      * destruct H. destruct (is_value_dec e1).
-        {
-         exists (KAppR e1 e k). exists t. reflexivity.  
-        }
-        {
-         rewrite He1 in H0. assumption.
-        }
+      * destruct H. exists (KAppR e1 k), t. reflexivity. 
+      * destruct H. exists (KAppR e1 k), t. reflexivity.  
     + exists KHole. exists (Core.app e1 e2). reflexivity.
-Admitted.
+  - simpl. right. split. reflexivity. destruct (decompose e).
+    + destruct p. exists (KAlloc k). exists t. reflexivity.
+    + exists KHole. exists (alloc e). reflexivity.
+  - simpl. right. split. reflexivity. destruct (decompose e).
+    + destruct p. exists (KDeAlloc k), t. reflexivity.
+    + exists KHole, (! e). reflexivity.
+  - simpl. right. split. reflexivity. destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
+    + destruct p. exists (KAssignL k e2), t. reflexivity.
+    + destruct p. exists (KAssignL k e2), t. reflexivity.
+    + destruct p. specialize (IHe1 e1 eq_refl eq_refl). destruct IHe1. reflexivity.
+      * destruct H. exists (KAssignR e1 k), t. reflexivity.
+      * destruct H. exists (KAssignR e1 k), t. reflexivity.
+    + exists KHole, (assign e1 e2). reflexivity.
+  - simpl.
+    assert (e1 ~= e1 /\ e2 ~= e2 ) as Ho. {
+      split; reflexivity; reflexivity.
+    }
+    destruct Ho. 
+    specialize (IHe1 e1 eq_refl eq_refl H). specialize (IHe2 e2 eq_refl eq_refl H0).
+    destruct IHe1; destruct IHe2.
+    + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. left. split. reflexivity. 
+      destruct (decompose e1); destruct (decompose e2); try inversion H4.
+      * destruct p. inversion H3.
+      * reflexivity.
+    + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
+      destruct (decompose e1); destruct (decompose e2).
+      * destruct p. exists (KPairL k e2), t. reflexivity.
+      * destruct p. exists (KPairL k e2), t. reflexivity.
+      * destruct p. exists (KPairR e1 k), t. reflexivity.
+      * assumption.
+    + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
+      destruct (decompose e1); destruct (decompose e2); try inversion H4.
+      * destruct p. exists (KPairL k e2), t. reflexivity.
+      * assumption.
+    + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
+      destruct (decompose e1); destruct (decompose e2).
+      * destruct p. exists (KPairL k e2), t. reflexivity.
+      * destruct p. exists (KPairL k e2), t. reflexivity.
+      * destruct p. exists (KPairR e1 k), t. reflexivity.
+      * assumption.
+  - simpl. right. split. reflexivity.
+    destruct (decompose e).
+    + destruct p. exists (KFst k), t. reflexivity.
+    + exists KHole, (left_tm e). auto.
+  - simpl. right. split. reflexivity.
+    destruct (decompose e).
+    + destruct p. exists (KSnd k), t. reflexivity.
+    + exists KHole, (right_tm e). auto.
+  - simpl. specialize (IHe e eq_refl eq_refl).  
+    assert (e ~= e) as E. reflexivity.
+    specialize (IHe E). destruct IHe.
+    + destruct H. rewrite H. left. split. reflexivity.
+      destruct (decompose e).
+      * destruct p. inversion H0.
+      * reflexivity.
+    + destruct H. rewrite H. right. split. reflexivity.
+      destruct (decompose e).
+      * destruct p. exists (KInl k), t. reflexivity.
+      * destruct H0. destruct H0. inversion H0.  
+ Admitted.
 
 Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
   match c with 
@@ -560,11 +624,11 @@ Proof.
   - admit.
   - destruct (decompose e) eqn:He in H1. destruct p.
     + inversion H1; subst. specialize (IHe e eq_refl eq_refl).
-      assert (e ~= e) as E. {
-        reflexivity.
-      }
+      assert (e ~= e) as E. reflexivity.
       specialize (IHe E k r He). rewrite IHe. simpl. reflexivity.
     + inversion H1; subst. simpl. reflexivity.
+  - destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
+    + inversion H1; subst.     
 Admitted.   
 
 Require Import Lia.
