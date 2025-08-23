@@ -569,6 +569,13 @@ Admitted.
 
 Require Import Lia.
 
+Lemma uniform_bind_congr {A B} (c : Dist A) (f g : A -> option (Dist B)) d :
+  (forall x dx, f x = Some dx -> g x = Some dx) ->
+  uniform_bind c f = Some d ->
+  uniform_bind c g = Some d.
+Proof.
+Admitted.
+
 Lemma exec_monotonicity : forall k k' e memory s D,
   exec k e memory s = Some D ->
   k' >= k ->
