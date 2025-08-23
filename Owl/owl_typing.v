@@ -567,59 +567,43 @@ Proof.
     + inversion H1; subst. simpl. reflexivity.
 Admitted.   
 
-Lemma uniform_bind_congr {A B}
-      (c : Dist A) (f g : A -> option (Dist B)) d :
-  (forall a d', f a = Some d' -> g a = Some d') ->
-  uniform_bind c f = Some d ->
-  uniform_bind c g = Some d.
-Proof.
-Admitted.
-
 Require Import Lia.
-
 
 Lemma exec_monotonicity : forall k k' e memory s D,
   exec k e memory s = Some D ->
   k' >= k ->
   exec k' e memory s = Some D.
 Proof.
-  intros.
   induction k.
-  - inversion H; subst. destruct (is_value_b e) eqn:Hv.
+  - intros. inversion H; subst. destruct (is_value_b e) eqn:Hv.
     + rewrite <- H2 in H. unfold exec. inversion H0; subst.
       * rewrite Hv. reflexivity.
       * rewrite Hv. reflexivity.
     + inversion H2.
-  - specialize unique_decomposition as Hud.
+  - intros. specialize unique_decomposition as Hud.
     specialize (Hud e). destruct Hud.
     + destruct H1. unfold exec. inversion H0; subst.
       * rewrite H1. inversion H; subst. rewrite H1 in H4. rewrite H1. rewrite H4. reflexivity.
       * rewrite H1. inversion H; subst. rewrite H1 in H5. rewrite H1. reflexivity.
     + destruct H1. destruct H2. destruct H2. specialize (eq_decompose e x x0 H2) as Hd. specialize H as H'.
-      unfold exec in H. rewrite H1 in H. rewrite H2 in H. destruct (reduce x0 memory s).
+      unfold exec in H. rewrite H1 in H. rewrite H2 in H. destruct (reduce x0 memory s) eqn:Hr.
       * simpl in H. fold exec in H. 
         induction k'. inversion H0.
-        assert ((pat <-? d;;
-                  (let
-                    '(p, s') := pat in let '(e', m') := p in exec k (Plug x e') m' s')) = 
-                (pat <-? d;;
-                  (let
-                    '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s'))) as Hz. {
-                      specialize (uniform_bind_congr d (fun z => (let '(p, s') := z in let '(e', m') := p in exec k (Plug x e') m' s'))) as Hu.
-                      specialize (Hu (fun z => (let '(p, s') := z in let '(e', m') := p in exec k' (Plug x e') m' s'))).
-                      specialize (Hu D). 
-                      assert ((forall (a : tm 0 0 * mem 0 0 * binary) (d' : Dist (tm 0 0 * mem 0 0 * binary)),
-                                (fun '(p, s') => let '(e', m') := p in exec k (Plug x e') m' s') a = Some d' ->
-                                (fun '(p, s') => let '(e', m') := p in exec k' (Plug x e') m' s') a = Some d')) as Hz. {
-                                  intros.
-                                  assert (k' >= k) as Hge. {
-                                    lia.
-                                  }
-                                  
-
-                                }
-                    }  
-      * inversion H.  
+        rewrite Hd in H'. inversion Hr; subst.
+        rewrite <- H' in H.
+        assert ((pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s')) =
+                exec (S k') (Plug x x0) memory s) as Hh. {
+          unfold exec. rewrite H1. rewrite H2. rewrite H4. fold exec. reflexivity.
+        }
+        assert ((pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s')) =
+                (pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k (Plug x e') m' s'))) as Hw. {
+          admit.
+        }
+        rewrite <- Hw in H. rewrite Hh in H. rewrite H. apply H'.
+      * inversion H.
+Admitted.
+        
+        
 
 Lemma well_bracketed : forall k K e memory s D D',
   exec (S k) (Plug K e) memory s = Some D ->
