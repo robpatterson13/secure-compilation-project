@@ -2,6 +2,7 @@ Require Import core fintype owl constants Dist.
 
 Require Import List. 
 Import ListNotations.
+Require Import Lia.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
@@ -238,6 +239,34 @@ Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
    | KSync K' => (sync (Plug K' t))
    | KOp f vs K' es => Op f (vs ++ Plug K' t :: es)
    end.
+
+(* Peace of mind for later on *)
+Inductive wfKctx : (@Kctx 0 0) -> Prop :=
+| wfKHole : wfKctx KHole
+| wfZero  K      : wfKctx K -> wfKctx (ZeroK K)
+| wfAppL  K e    : wfKctx K -> wfKctx (KAppL K e)
+| wfAppR  v K    : wfKctx K -> is_value_b v = true -> wfKctx (KAppR v K)
+| wfAlloc K      : wfKctx K -> wfKctx (KAlloc K)
+| wfDeAlloc K    : wfKctx K -> wfKctx (KDeAlloc K)
+| wfAssignL K e  : wfKctx K -> wfKctx (KAssignL K e)
+| wfAssignR v K  : wfKctx K -> is_value_b v = true -> wfKctx (KAssignR v K)
+| wfPairL  K e   : wfKctx K -> wfKctx (KPairL K e)
+| wfPairR  v K   : wfKctx K -> is_value_b v = true -> wfKctx (KPairR v K)
+| wfFst    K     : wfKctx K -> wfKctx (KFst K)
+| wfSnd    K     : wfKctx K -> wfKctx (KSnd K)
+| wfInl    K     : wfKctx K -> wfKctx (KInl K)
+| wfInR    K     : wfKctx K -> wfKctx (KInR K)
+| wfCase   K e1 e2 : wfKctx K -> wfKctx (KCase K e1 e2)
+| wfTapp   K     : wfKctx K -> wfKctx (KTapp K)
+| wfLapp   K lab : wfKctx K -> wfKctx (KLapp K lab)
+| wfPack   K     : wfKctx K -> wfKctx (KPack K)
+| wfUnpack K e   : wfKctx K -> wfKctx (KUnpack K e)
+| wfIf     K e1 e2 : wfKctx K -> wfKctx (KIf K e1 e2)
+| wfSync   K     : wfKctx K -> wfKctx (KSync K)
+| wfOp     f vs K es
+    : wfKctx K
+    -> Forall (fun v => is_value_b v = true) vs
+    -> wfKctx (KOp f vs K es).
 
 Fixpoint split_values {l m}
          (xs : list (tm l m))
@@ -476,34 +505,20 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
   | _ => None
   end.
 
-(* Peace of mind for later on *)
-Inductive wfKctx {l m} : Kctx -> Prop :=
-| wfKHole : wfKctx (@KHole l m)
-| wfZero  K      : wfKctx K -> wfKctx (ZeroK K)
-| wfAppL  K e    : wfKctx K -> wfKctx (KAppL K e)
-| wfAppR  v K    : wfKctx K -> is_value_b v = true -> wfKctx (KAppR v K)
-| wfAlloc K      : wfKctx K -> wfKctx (KAlloc K)
-| wfDeAlloc K    : wfKctx K -> wfKctx (KDeAlloc K)
-| wfAssignL K e  : wfKctx K -> wfKctx (KAssignL K e)
-| wfAssignR v K  : wfKctx K -> is_value_b v = true -> wfKctx (KAssignR v K)
-| wfPairL  K e   : wfKctx K -> wfKctx (KPairL K e)
-| wfPairR  v K   : wfKctx K -> is_value_b v = true -> wfKctx (KPairR v K)
-| wfFst    K     : wfKctx K -> wfKctx (KFst K)
-| wfSnd    K     : wfKctx K -> wfKctx (KSnd K)
-| wfInl    K     : wfKctx K -> wfKctx (KInl K)
-| wfInR    K     : wfKctx K -> wfKctx (KInR K)
-| wfCase   K e1 e2 : wfKctx K -> wfKctx (KCase K e1 e2)
-| wfTapp   K     : wfKctx K -> wfKctx (KTapp K)
-| wfLapp   K lab : wfKctx K -> wfKctx (KLapp K lab)
-| wfPack   K     : wfKctx K -> wfKctx (KPack K)
-| wfUnpack K e   : wfKctx K -> wfKctx (KUnpack K e)
-| wfIf     K e1 e2 : wfKctx K -> wfKctx (KIf K e1 e2)
-| wfSync   K     : wfKctx K -> wfKctx (KSync K)
-| wfOp     f vs K es
-    : wfKctx K
-    -> Forall (fun v => is_value_b v = true) vs
-    -> wfKctx (KOp f vs K es).
-
+(* To be completed sometime in the future, perhaps *)
+Lemma wf_decompose : forall e K r,
+  decompose e = Some (K, r) ->
+  wfKctx K.
+Proof. 
+  dependent induction e; intros; try inversion H.
+  - admit.
+  - destruct (decompose e) eqn:Hd.
+    + destruct p. inversion H1; subst. constructor. 
+      assert (e ~= e) as E. reflexivity.
+      specialize (IHe e eq_refl eq_refl E k r). apply IHe. apply Hd.
+    + inversion H1; subst. constructor.
+Admitted.  
+  
 (* Lemma 1 for decompose *)
 Lemma unique_decomposition : forall (e : tm 0 0),
   (is_value_b e = true /\ decompose e = None) \/
@@ -586,7 +601,8 @@ Proof.
     + destruct H. rewrite H. right. split. reflexivity.
       destruct (decompose e).
       * destruct p. exists (KInl k), t. reflexivity.
-      * destruct H0. destruct H0. inversion H0.  
+      * destruct H0. destruct H0. inversion H0. 
+  (* Tedious, finish later *)
  Admitted.
 
 Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
@@ -630,8 +646,6 @@ Proof.
   - destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
     + inversion H1; subst.     
 Admitted.   
-
-Require Import Lia.
 
 Lemma uniform_bind_congr {A B} (c : Dist A) (f g : A -> option (Dist B)) d :
   (forall x dx, f x = Some dx -> g x = Some dx) ->
