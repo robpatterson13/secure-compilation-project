@@ -243,30 +243,29 @@ Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
 (* Peace of mind for later on *)
 Inductive wfKctx : (@Kctx 0 0) -> Prop :=
 | wfKHole : wfKctx KHole
-| wfZero  K      : wfKctx K -> wfKctx (ZeroK K)
-| wfAppL  K e    : wfKctx K -> wfKctx (KAppL K e)
-| wfAppR  v K    : wfKctx K -> is_value_b v = true -> wfKctx (KAppR v K)
-| wfAlloc K      : wfKctx K -> wfKctx (KAlloc K)
-| wfDeAlloc K    : wfKctx K -> wfKctx (KDeAlloc K)
-| wfAssignL K e  : wfKctx K -> wfKctx (KAssignL K e)
-| wfAssignR v K  : wfKctx K -> is_value_b v = true -> wfKctx (KAssignR v K)
-| wfPairL  K e   : wfKctx K -> wfKctx (KPairL K e)
-| wfPairR  v K   : wfKctx K -> is_value_b v = true -> wfKctx (KPairR v K)
-| wfFst    K     : wfKctx K -> wfKctx (KFst K)
-| wfSnd    K     : wfKctx K -> wfKctx (KSnd K)
-| wfInl    K     : wfKctx K -> wfKctx (KInl K)
-| wfInR    K     : wfKctx K -> wfKctx (KInR K)
-| wfCase   K e1 e2 : wfKctx K -> wfKctx (KCase K e1 e2)
-| wfTapp   K     : wfKctx K -> wfKctx (KTapp K)
-| wfLapp   K lab : wfKctx K -> wfKctx (KLapp K lab)
-| wfPack   K     : wfKctx K -> wfKctx (KPack K)
-| wfUnpack K e   : wfKctx K -> wfKctx (KUnpack K e)
-| wfIf     K e1 e2 : wfKctx K -> wfKctx (KIf K e1 e2)
-| wfSync   K     : wfKctx K -> wfKctx (KSync K)
-| wfOp     f vs K es
-    : wfKctx K
-    -> Forall (fun v => is_value_b v = true) vs
-    -> wfKctx (KOp f vs K es).
+| wfZero : forall K, wfKctx K -> wfKctx (ZeroK K)
+| wfAppL : forall K e, wfKctx K -> wfKctx (KAppL K e)
+| wfAppR : forall v K, wfKctx K -> is_value_b v = true -> wfKctx (KAppR v K)
+| wfAlloc : forall K, wfKctx K -> wfKctx (KAlloc K)
+| wfDeAlloc : forall K, wfKctx K -> wfKctx (KDeAlloc K)
+| wfAssignL : forall K e, wfKctx K -> wfKctx (KAssignL K e)
+| wfAssignR : forall v K, wfKctx K -> is_value_b v = true -> wfKctx (KAssignR v K)
+| wfPairL : forall K e, wfKctx K -> wfKctx (KPairL K e)
+| wfPairR : forall v K, wfKctx K -> is_value_b v = true -> wfKctx (KPairR v K)
+| wfFst : forall K, wfKctx K -> wfKctx (KFst K)
+| wfSnd : forall K, wfKctx K -> wfKctx (KSnd K)
+| wfInl : forall K, wfKctx K -> wfKctx (KInl K)
+| wfInR : forall K, wfKctx K -> wfKctx (KInR K)
+| wfCase : forall K e1 e2, wfKctx K -> wfKctx (KCase K e1 e2)
+| wfTapp : forall K, wfKctx K -> wfKctx (KTapp K)
+| wfLapp : forall K lab, wfKctx K -> wfKctx (KLapp K lab)
+| wfPack : forall K, wfKctx K -> wfKctx (KPack K)
+| wfUnpack : forall K e, wfKctx K -> wfKctx (KUnpack K e)
+| wfIf : forall K e1 e2, wfKctx K -> wfKctx (KIf K e1 e2)
+| wfSync : forall K, wfKctx K -> wfKctx (KSync K)
+| wfOp : forall f vs K es, 
+  wfKctx K -> 
+  Forall (fun v => is_value_b v = true) vs -> wfKctx (KOp f vs K es).
 
 Fixpoint split_values {l m}
          (xs : list (tm l m))
@@ -504,20 +503,6 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
     in scan f [] es
   | _ => None
   end.
-
-(* To be completed sometime in the future, perhaps *)
-Lemma wf_decompose : forall e K r,
-  decompose e = Some (K, r) ->
-  wfKctx K.
-Proof. 
-  dependent induction e; intros; try inversion H.
-  - admit.
-  - destruct (decompose e) eqn:Hd.
-    + destruct p. inversion H1; subst. constructor. 
-      assert (e ~= e) as E. reflexivity.
-      specialize (IHe e eq_refl eq_refl E k r). apply IHe. apply Hd.
-    + inversion H1; subst. constructor.
-Admitted.  
   
 (* Lemma 1 for decompose *)
 Lemma unique_decomposition : forall (e : tm 0 0),
@@ -637,7 +622,11 @@ Lemma eq_decompose : forall e K r,
 Proof.
   intros.
   dependent induction e; try inversion H; subst.
-  - admit.
+  - induction l.
+    + inversion H1; subst. simpl. reflexivity.
+    + destruct (a :: l) eqn:He.
+      * inversion He.
+      * admit.  
   - destruct (decompose e) eqn:He in H1. destruct p.
     + inversion H1; subst. specialize (IHe e eq_refl eq_refl).
       assert (e ~= e) as E. reflexivity.
@@ -645,7 +634,62 @@ Proof.
     + inversion H1; subst. simpl. reflexivity.
   - destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
     + inversion H1; subst.     
-Admitted.   
+Admitted.
+
+(* To be completed sometime in the future, perhaps *)
+Lemma wf_decompose : forall (e : tm 0 0) K r,
+  decompose e = Some (K, r) ->
+  wfKctx K.
+Proof. 
+  dependent induction e; intros K r H; simpl in H;
+  try (inversion H; subst; constructor; fail).
+  - simpl in H.
+    set (Scan :=
+         fun (vs xs : list (tm 0 0)) =>
+           (fix scan (f0 : op) (vs xs : list (tm 0 0)) {struct xs}
+              : option (Kctx * tm 0 0) :=
+              match xs with
+              | [] => Some (KHole, Op f0 vs)
+              | a :: xs' =>
+                  if is_value_b a
+                  then scan f0 (vs ++ [a]) xs'
+                  else
+                    match decompose a with
+                    | Some (K0, r0) => Some (KOp f0 vs K0 xs', r0)
+                    | None => None
+                    end
+              end) o vs xs) in H.
+
+    assert (ScanWF :
+      forall (vs xs : list (tm 0 0)) (K' : Kctx) (r' : tm 0 0),
+      Forall (fun v => is_value_b v = true) vs ->
+      Scan vs xs = Some (K', r') ->
+      wfKctx K').
+    {
+      intros vs xs K' r' Hvs Hscan.
+      revert vs K' r' Hvs Hscan.
+      induction xs as [| a xs' IH].
+      intros vs0 K0 r0 Hvs0 Hscan0. inversion Hscan0; subst. constructor.
+      intros vs0 K0 r0 Hvs0 Hscan0.
+      unfold Scan in Hscan0. 
+      destruct (is_value_b a) eqn:Ha.
+      specialize (IH (vs0 ++ [a]) K0 r0). apply IH.
+      - apply Forall_app.
+        split.
+        exact Hvs0.
+        constructor.
+        apply Ha.
+        constructor. 
+      - apply Hscan0.
+      - induction (decompose a) eqn:Hda.
+        + destruct a0. inversion Hscan0; subst. admit.
+    } admit. 
+  - destruct (decompose e) eqn:Hd.
+    + destruct p. inversion H; subst. constructor. 
+      assert (e ~= e) as E. reflexivity.
+      specialize (IHe e eq_refl eq_refl E k r). apply IHe. apply Hd.
+    + inversion H; subst. constructor.
+Admitted.  
 
 Lemma uniform_bind_congr {A B} (c : Dist A) (f g : A -> option (Dist B)) d :
   (forall x dx, f x = Some dx -> g x = Some dx) ->
