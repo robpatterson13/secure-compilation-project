@@ -691,54 +691,115 @@ Proof.
     + inversion H; subst. constructor.
 Admitted.  
 
-Lemma uniform_bind_congr {A B} (c : Dist A) (f g : A -> option (Dist B)) d :
-  (forall x dx, f x = Some dx -> g x = Some dx) ->
-  uniform_bind c f = Some d ->
-  uniform_bind c g = Some d.
+Lemma uniform_bind_ext_on {A B}
+  (d : Dist A) (K1 K2 : A -> option (Dist B)) :
+  (forall x, inSupport d x -> K1 x = K2 x) ->
+  uniform_bind d K1 = uniform_bind d K2.
+Proof.
+  intros.
+  induction d.
+  - simpl. specialize (H a).
+    simpl in H. apply H. reflexivity.
+  - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl. 
+    specialize (Hf (fun x hx => H x (or_introl hx))) as Ef. (* VERY USEFUL TOOLS *)
+    specialize (Ht (fun x hx => H x (or_intror hx))) as Et.
+    rewrite Ef. rewrite Et. reflexivity.
+Qed.
+
+Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
+  uniform_bind c k = Some d' ->
+  forall x, inSupport c x -> exists d'', k x = Some d''.
 Proof.
 Admitted.
 
 Lemma exec_monotonicity : forall k k' e memory s D,
   exec k e memory s = Some D ->
   k' >= k ->
-  exec k' e memory s = Some D.
+  exec k' e memory s = exec k e memory s.
 Proof.
+  intros.
+  revert e memory s D k' H0 H.
   induction k.
   - intros. inversion H; subst. destruct (is_value_b e) eqn:Hv.
     + rewrite <- H2 in H. unfold exec. inversion H0; subst.
-      * rewrite Hv. reflexivity.
+      * reflexivity.
       * rewrite Hv. reflexivity.
     + inversion H2.
   - intros. specialize unique_decomposition as Hud.
     specialize (Hud e). destruct Hud.
-    + destruct H1. unfold exec. inversion H0; subst.
-      * rewrite H1. inversion H; subst. rewrite H1 in H4. rewrite H1. rewrite H4. reflexivity.
-      * rewrite H1. inversion H; subst. rewrite H1 in H5. rewrite H1. reflexivity.
+    + destruct H1. unfold exec. destruct k'.
+      * rewrite H1. inversion H; subst. rewrite H1 in H4. reflexivity.
+      * rewrite H1. inversion H; subst. reflexivity.
     + destruct H1. destruct H2. destruct H2. specialize (eq_decompose e x x0 H2) as Hd. specialize H as H'.
-      unfold exec in H. rewrite H1 in H. rewrite H2 in H. destruct (reduce x0 memory s) eqn:Hr.
-      * simpl in H. fold exec in H. 
-        induction k'. inversion H0.
-        rewrite Hd in H'. inversion Hr; subst.
-        rewrite <- H' in H.
-        assert ((pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s')) =
-                exec (S k') (Plug x x0) memory s) as Hh. {
-          unfold exec. rewrite H1. rewrite H2. rewrite H4. fold exec. reflexivity.
+      rewrite Hd in H. unfold exec in H. destruct (is_value_b (Plug x x0)) eqn:Hv.
+      * inversion H; subst. rewrite H1 in Hv. inversion Hv. (* disproved *)
+      * induction k'. inversion H0. destruct (decompose (Plug x x0)) eqn:HP.
+        assert (Hkn : decompose (Plug x x0) = Some (x, x0)). {
+          rewrite Hd in H2. apply H2.
         }
-        assert ((pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k' (Plug x e') m' s')) =
-                (pat <-? d;; (let '(p, s') := pat in let '(e', m') := p in exec k (Plug x e') m' s'))) as Hw. {
-          admit.
+        rewrite Hkn in HP. inversion HP; subst. 
+        destruct (reduce x0 memory s) eqn:Hre. fold exec in H.
+        set (K1 :=
+          fun x1 =>
+            let '(p,s') := x1 in let '(e',m') := p in
+            exec k  (Plug x e') m' s').
+        set (K2 :=
+          fun x1 =>
+            let '(p,s') := x1 in let '(e',m') := p in
+            exec k' (Plug x e') m' s').
+        specialize (uniform_bind_ext_on d K2 K1) as Hun.
+        assert ((forall x : tm 0 0 * mem 0 0 * binary, inSupport d x -> K2 x = K1 x)) as Hfar. {
+          intros x1 Hin.
+          destruct x1 as [[e' m'] s'].
+          destruct (uniform_bind_all_some _ _ _ H _ Hin).
+          assert (Hge : k' >= k) by lia.
+          specialize (IHk (Plug x e') m' s' x1 k' Hge H3).
+          exact IHk.
         }
-        rewrite <- Hw in H. rewrite Hh in H. rewrite H. apply H'.
-      * inversion H.
-Admitted.
-        
+        specialize (Hun Hfar). unfold K2 in Hun. unfold K1 in Hun. rewrite <- Hun in H.
+        unfold exec. rewrite H1. rewrite H2. destruct (reduce x0 memory s). fold exec.
+        inversion Hre; subst. apply Hun. reflexivity.
+        inversion H.
+        inversion H. 
+Qed.
+
         
 
 Lemma well_bracketed : forall k K e memory s D D',
-  exec (S k) (Plug K e) memory s = Some D ->
+  exec k (Plug K e) memory s = Some D ->
   exec k e memory s = Some D' -> 
   (e_mem <-? D';; (exec k (Plug K (fst (fst e_mem))) (snd (fst e_mem)) (snd e_mem))) = Some D.
 Proof.
+  induction k; intros.
+  simpl in H. simpl in H0.
+  simpl. destruct (is_value_b e) eqn:Hiv.
+  - inversion H0; subst. simpl. destruct (is_value_b (Plug K e)).
+    + apply H.
+    + inversion H.
+  - inversion H0; subst.
+  - simpl in *. destruct (is_value_b e).
+    + inversion H0; subst. simpl. apply H.
+    + destruct (decompose e) eqn:Hde.
+      * destruct p. specialize (eq_decompose e k0 t Hde) as Hq.
+        rewrite Hq in H. destruct (is_value_b (Plug K (Plug k0 t))).
+        {
+          inversion H; subst. simpl.
+         admit. 
+        }
+        {
+          destruct ( decompose (Plug K (Plug k0 t))).
+          - destruct p. destruct (reduce t0 memory s) eqn:Hr.
+            + specialize (IHk).    
+        }
+
+  induction k.
+  - intros. inversion H; subst. destruct (is_value_b (Plug K e)) eqn:Hd.
+    + simpl. inversion H2; subst.
+      assert (Some (ret (Plug K e, memory, s)) = (e_mem <-? (ret (Plug K e, memory, s));; Some (ret ((fst (fst e_mem)), (snd (fst e_mem)), (snd e_mem))))) as Hw. {
+        simpl. reflexivity.
+      }
+      simpl in Hw. rewrite <- H in Hw.
+      rewrite Hw in H.
 Admitted.
 
 (** TODO:
