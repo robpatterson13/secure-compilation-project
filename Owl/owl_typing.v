@@ -710,18 +710,17 @@ Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
   uniform_bind c k = Some d' ->
   forall x, inSupport c x -> exists d'', k x = Some d''.
 Proof.
-  intros.
-  induction c.
-  - simpl in H. simpl in H0. rewrite <- H0 in H.
-    exists d'. apply H.
-  - specialize (H1 false) as Hf. specialize (H1 true) as Ht. unfold inSupport in H0. destruct H0. 
-    apply Hf.
-    + admit. 
-    + apply H0.
-    + apply Ht.
-      * admit.
-      * apply H0.
-Admitted.
+  revert k d'.
+  induction c; intros k d' Hb x Hsup; simpl in *.
+  - subst. eexists. exact Hb.
+  - destruct (uniform_bind (d false) k) eqn:Hf0;
+    destruct (uniform_bind (d true)  k) eqn:Hf1;
+    try discriminate Hb.
+    inversion Hb; subst; clear Hb.
+    destruct Hsup.
+    + eapply H. apply Hf0. assumption.
+    + eapply H. apply Hf1. assumption.
+Qed. 
 
 Lemma exec_monotonicity : forall k k' e memory s D,
   exec k e memory s = Some D ->
