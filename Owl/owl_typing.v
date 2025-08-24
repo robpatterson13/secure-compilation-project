@@ -691,6 +691,7 @@ Proof.
     + inversion H; subst. constructor.
 Admitted.  
 
+(* Move to Dist *)
 Lemma uniform_bind_ext_on {A B}
   (d : Dist A) (K1 K2 : A -> option (Dist B)) :
   (forall x, inSupport d x -> K1 x = K2 x) ->
@@ -706,6 +707,7 @@ Proof.
     rewrite Ef. rewrite Et. reflexivity.
 Qed.
 
+(* Move to Dist *)
 Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
   uniform_bind c k = Some d' ->
   forall x, inSupport c x -> exists d'', k x = Some d''.
