@@ -794,6 +794,17 @@ Proof.
         rewrite Hq in H. destruct (is_value_b (Plug K (Plug k0 t))). admit.
         destruct (decompose (Plug K (Plug k0 t))) eqn:Hd. destruct p.
         destruct (reduce t0 memory s) eqn:Hr.
+        set (K1 := fun x1 =>
+                    let '(p,s') := x1 in let '(e',m') := p in exec k (Plug k1 e') m' s').
+        set (K2 := fun x1 =>
+                    let '(p,s') := x1 in let '(e',m') := p in exec k (Plug K (Plug k0 e')) m' s').
+        specialize (uniform_bind_ext_on d K1 K2) as Hun.
+        assert (forall x : tm 0 0 * mem 0 0 * binary, inSupport d x -> K1 x = K2 x) as Hfar. {
+          intros.
+          
+          admit.
+        }
+        specialize (Hun Hfar). unfold K1 in Hun. unfold K2 in Hun. rewrite Hun in H. 
 Admitted.
 
 (** TODO:
