@@ -783,6 +783,18 @@ Proof.
     simpl in H. destruct (is_value_b (Plug K e)) eqn:Hh. inversion H; subst. simpl. rewrite Hh; simpl. reflexivity.
     simpl. rewrite Hh. apply H.
     (* destruct case 2 : assume e is NOT a value *)
+    assert (exists K r, e = (Plug K r)). admit. destruct H1; destruct H1.
+    assert (exec (S k) (Plug K e) memory s = exec (S k) (Plug K (Plug x x0)) memory s). rewrite H1. reflexivity.
+    assert (forall d, reduce x0 memory s = Some d-> exec (S k) (Plug K (Plug x x0)) memory s = 
+                      (uniform_bind d (fun '(e', m', s') => (exec k (Plug K (Plug x e')) m' s')))). admit.
+    assert (forall d D', ((fun '(e', m', s') => (exec k (Plug x e') m' s')) D') = Some d ->
+                         ((fun '(e', m', s') => (exec k (Plug K (Plug x e')) m' s')) D') = 
+                         (uniform_bind d (fun '(e'', m'', s'') => (exec k (Plug K (Plug x e'')) m'' s'')))). admit.
+    
+    
+
+
+
     specialize (unique_decomposition e) as Hud. destruct Hud. destruct H1.
     rewrite H1 in Hvv. inversion Hvv.
     destruct H1. destruct H2. destruct H2. rewrite H2 in H0. 
@@ -791,7 +803,7 @@ Proof.
     inversion H; subst. admit.
     (* main case *)
     specialize (unique_decomposition (Plug K e)) as Hud2. destruct Hud2. destruct H3. rewrite H3 in His. inversion His.
-    destruct H3. destruct H4. destruct H4. rewrite H4 in H.  destruct (reduce x2 memory s) eqn:Hrd. admit.
+    destruct H3. destruct H4. destruct H4. rewrite H4 in H. destruct (reduce x2 memory s) eqn:Hrd. admit.
     inversion H. inversion H0. 
 Admitted.
 
