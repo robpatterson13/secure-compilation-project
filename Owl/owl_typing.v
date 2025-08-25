@@ -640,7 +640,7 @@ Admitted.
 Lemma wf_decompose : forall (e : tm 0 0) K r,
   decompose e = Some (K, r) ->
   wfKctx K.
-Proof. 
+Proof.
   dependent induction e; intros K r H; simpl in H;
   try (inversion H; subst; constructor; fail).
   - simpl in H.
@@ -701,10 +701,10 @@ Proof.
   induction d.
   - simpl. specialize (H a).
     simpl in H. apply H. reflexivity.
-  - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl. 
-    specialize (Hf (fun x hx => H x (or_introl hx))) as Ef. (* VERY USEFUL TOOLS *)
-    specialize (Ht (fun x hx => H x (or_intror hx))) as Et.
-    rewrite Ef. rewrite Et. reflexivity.
+  - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl.
+    specialize (Hf (fun x hx => H x (or_introl hx))) as Ef1. (* VERY USEFUL TOOLS *)
+    specialize (Ht (fun x hx => H x (or_intror hx))) as Et1.
+    rewrite Ef1. rewrite Et1. reflexivity.
 Qed.
 
 (* Move to Dist *)
@@ -775,8 +775,6 @@ Proof.
         inversion H. 
 Qed.
 
-        
-
 Lemma well_bracketed : forall k K e memory s D D',
   exec k (Plug K e) memory s = Some D ->
   exec k e memory s = Some D' -> 
@@ -793,35 +791,18 @@ Proof.
     + inversion H0; subst. simpl. apply H.
     + destruct (decompose e) eqn:Hde.
       * destruct p. specialize (eq_decompose e k0 t Hde) as Hq.
-        rewrite Hq in H. destruct (is_value_b (Plug K (Plug k0 t))).
-        {
-          inversion H; subst. simpl.
-         admit. 
-        }
-        {
-          destruct ( decompose (Plug K (Plug k0 t))).
-          - destruct p. destruct (reduce t0 memory s) eqn:Hr.
-            + specialize (IHk).    
-        }
-
-  induction k.
-  - intros. inversion H; subst. destruct (is_value_b (Plug K e)) eqn:Hd.
-    + simpl. inversion H2; subst.
-      assert (Some (ret (Plug K e, memory, s)) = (e_mem <-? (ret (Plug K e, memory, s));; Some (ret ((fst (fst e_mem)), (snd (fst e_mem)), (snd e_mem))))) as Hw. {
-        simpl. reflexivity.
-      }
-      simpl in Hw. rewrite <- H in Hw.
-      rewrite Hw in H.
+        rewrite Hq in H. destruct (is_value_b (Plug K (Plug k0 t))). admit.
+        destruct (decompose (Plug K (Plug k0 t))) eqn:Hd. destruct p.
+        destruct (reduce t0 memory s) eqn:Hr.
 Admitted.
 
 (** TODO:
-  - Move uniform_bind into Dist.v TBD
-  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) 1.5/2 Done
+  - Move uniform_bind into Dist.v TBD but EASY
+  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) SORT OF Done
   - Encoding the adversary TBD
   - Finish reduce; get rid of Inductive versions DONE
-  - Do monotonicity lemma TBD
-  - Well-bracketed lemma TBD
-  *)
+  - Do monotonicity lemma DONE
+  - Well-bracketed lemma TBD *)
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
