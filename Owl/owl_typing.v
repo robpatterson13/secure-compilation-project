@@ -504,7 +504,7 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
   | _ => None
   end.
   
-(* Lemma 1 for decompose *)
+(* Decompose Lemma 1 *)
 Lemma unique_decomposition : forall (e : tm 0 0),
   (is_value_b e = true /\ decompose e = None) \/
     (is_value_b e = false /\
@@ -598,8 +598,6 @@ Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (
     | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
     | _, _ => None end end.
 
-Notation "x <-? c1 ;; c2" := (uniform_bind c1 (fun x => c2))
-  (at level 100, c1 at next level, right associativity).
 
 Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match k with 
@@ -616,6 +614,7 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
           uniform_bind D (fun '(e', m', s') => 
             exec k' (Plug K e') m' s') end end end.
 
+(* Decompose Lemma 2 *)
 Lemma eq_decompose : forall e K r,
   decompose e = Some (K, r) ->
   e = (Plug K r).
@@ -636,54 +635,14 @@ Proof.
     + inversion H1; subst.     
 Admitted.
 
-(* To be completed sometime in the future, perhaps *)
+(* Decompose Lemma 3 *)
 Lemma wf_decompose : forall (e : tm 0 0) K r,
   decompose e = Some (K, r) ->
   wfKctx K.
 Proof.
   dependent induction e; intros K r H; simpl in H;
   try (inversion H; subst; constructor; fail).
-  - simpl in H.
-    set (Scan :=
-         fun (vs xs : list (tm 0 0)) =>
-           (fix scan (f0 : op) (vs xs : list (tm 0 0)) {struct xs}
-              : option (Kctx * tm 0 0) :=
-              match xs with
-              | [] => Some (KHole, Op f0 vs)
-              | a :: xs' =>
-                  if is_value_b a
-                  then scan f0 (vs ++ [a]) xs'
-                  else
-                    match decompose a with
-                    | Some (K0, r0) => Some (KOp f0 vs K0 xs', r0)
-                    | None => None
-                    end
-              end) o vs xs) in H.
-
-    assert (ScanWF :
-      forall (vs xs : list (tm 0 0)) (K' : Kctx) (r' : tm 0 0),
-      Forall (fun v => is_value_b v = true) vs ->
-      Scan vs xs = Some (K', r') ->
-      wfKctx K').
-    {
-      intros vs xs K' r' Hvs Hscan.
-      revert vs K' r' Hvs Hscan.
-      induction xs as [| a xs' IH].
-      intros vs0 K0 r0 Hvs0 Hscan0. inversion Hscan0; subst. constructor.
-      intros vs0 K0 r0 Hvs0 Hscan0.
-      unfold Scan in Hscan0. 
-      destruct (is_value_b a) eqn:Ha.
-      specialize (IH (vs0 ++ [a]) K0 r0). apply IH.
-      - apply Forall_app.
-        split.
-        exact Hvs0.
-        constructor.
-        apply Ha.
-        constructor. 
-      - apply Hscan0.
-      - induction (decompose a) eqn:Hda.
-        + destruct a0. inversion Hscan0; subst. admit.
-    } admit. 
+  - simpl in H. admit.
   - destruct (decompose e) eqn:Hd.
     + destruct p. inversion H; subst. constructor. 
       assert (e ~= e) as E. reflexivity.
@@ -775,36 +734,66 @@ Proof.
         inversion H. 
 Qed.
 
+Lemma exec_to_bind : forall e K k r memory s d,
+  is_value_b e = false ->
+  decompose e = Some (K, r) ->
+  reduce r memory s = Some d ->
+  exec (S k) (Plug K r) memory s = uniform_bind d (fun '(e', m', s') => exec k (Plug K e') m' s').
+Proof.
+  intros. simpl. specialize (eq_decompose e K r H0). 
+  intros. 
+  inversion H2; subst. 
+  rewrite H. 
+  rewrite H0. 
+  rewrite H1. 
+  simpl. 
+  reflexivity.
+Qed.
+
+Lemma exec_to_bind_2 : forall e K K' k r r' memory s d,
+  is_value_b e = false ->
+  decompose e = Some (K, r) ->
+  decompose r = Some (K', r') ->
+  reduce r memory s = Some d ->
+  exec (S k) (Plug K (Plug K' r')) memory s = uniform_bind d (fun '(e', m', s') => exec k (Plug K (Plug K' e')) m' s').
+Proof.
+Admitted.
+
 Lemma well_bracketed : forall k K e memory s D D',
   exec k (Plug K e) memory s = Some D ->
   exec k e memory s = Some D' -> 
-  (e_mem <-? D';; (exec k (Plug K (fst (fst e_mem))) (snd (fst e_mem)) (snd e_mem))) = Some D.
+  (uniform_bind D' (fun '(e', m', s') =>(exec k (Plug K e') m' s'))) = Some D.
 Proof.
   induction k; intros.
+  (* k = 0 case *)
+  specialize H as Hprime. 
   simpl in H. simpl in H0.
   simpl. destruct (is_value_b e) eqn:Hiv.
-  - inversion H0; subst. simpl. destruct (is_value_b (Plug K e)).
+  - inversion H0; subst. simpl. destruct (is_value_b (Plug K e)) eqn:Hp.
     + apply H.
     + inversion H.
   - inversion H0; subst.
-  - simpl in *. destruct (is_value_b e).
-    + inversion H0; subst. simpl. apply H.
-    + destruct (decompose e) eqn:Hde.
-      * destruct p. specialize (eq_decompose e k0 t Hde) as Hq.
-        rewrite Hq in H. destruct (is_value_b (Plug K (Plug k0 t))). admit.
-        destruct (decompose (Plug K (Plug k0 t))) eqn:Hd. destruct p.
-        destruct (reduce t0 memory s) eqn:Hr.
-        set (K1 := fun x1 =>
-                    let '(p,s') := x1 in let '(e',m') := p in exec k (Plug k1 e') m' s').
-        set (K2 := fun x1 =>
-                    let '(p,s') := x1 in let '(e',m') := p in exec k (Plug K (Plug k0 e')) m' s').
-        specialize (uniform_bind_ext_on d K1 K2) as Hun.
-        assert (forall x : tm 0 0 * mem 0 0 * binary, inSupport d x -> K1 x = K2 x) as Hfar. {
-          intros.
-          
-          admit.
-        }
-        specialize (Hun Hfar). unfold K1 in Hun. unfold K2 in Hun. rewrite Hun in H. 
+  (* k + 1 case *)
+  - specialize H as ORIGINAL.
+    simpl in H0.
+    (* if e is a value *)
+    destruct (is_value_b e) eqn:Hvv.
+    inversion H0; subst.
+    (* destruct case 1 *)
+    simpl in H. destruct (is_value_b (Plug K e)) eqn:Hh. inversion H; subst. simpl. rewrite Hh; simpl. reflexivity.
+    destruct (decompose (Plug K e)) eqn:Hde.
+    assert (decompose (Plug K e) = Some (K, e)) as Hw. {
+      specialize (unique_decomposition (Plug K e)) as Hud.
+      destruct Hud.
+      destruct H1. rewrite H2 in Hde. inversion Hde.
+      destruct H1. destruct H2. destruct H2. rewrite H2. 
+    }
+    rewrite Hw in Hde. inversion Hde; subst.
+    destruct p. destruct (reduce t memory s) eqn:Hre.
+    assert (d = (ret (e, memory, s))). {
+
+    }
+
 Admitted.
 
 (** TODO:
