@@ -781,19 +781,18 @@ Proof.
     inversion H0; subst.
     (* destruct case 1 *)
     simpl in H. destruct (is_value_b (Plug K e)) eqn:Hh. inversion H; subst. simpl. rewrite Hh; simpl. reflexivity.
-    destruct (decompose (Plug K e)) eqn:Hde.
-    assert (decompose (Plug K e) = Some (K, e)) as Hw. {
-      specialize (unique_decomposition (Plug K e)) as Hud.
-      destruct Hud.
-      destruct H1. rewrite H2 in Hde. inversion Hde.
-      destruct H1. destruct H2. destruct H2. rewrite H2. 
-    }
-    rewrite Hw in Hde. inversion Hde; subst.
-    destruct p. destruct (reduce t memory s) eqn:Hre.
-    assert (d = (ret (e, memory, s))). {
-
-    }
-
+    simpl. rewrite Hh. apply H.
+    (* destruct case 2 : assume e is NOT a value *)
+    specialize (unique_decomposition e) as Hud. destruct Hud. destruct H1.
+    rewrite H1 in Hvv. inversion Hvv.
+    destruct H1. destruct H2. destruct H2. rewrite H2 in H0. 
+    destruct (reduce x0 memory s) eqn:Hre. 
+    simpl in H. destruct (is_value_b (Plug K e)) eqn:His.
+    inversion H; subst. admit.
+    (* main case *)
+    specialize (unique_decomposition (Plug K e)) as Hud2. destruct Hud2. destruct H3. rewrite H3 in His. inversion His.
+    destruct H3. destruct H4. destruct H4. rewrite H4 in H.  destruct (reduce x2 memory s) eqn:Hrd. admit.
+    inversion H. inversion H0. 
 Admitted.
 
 (** TODO:
