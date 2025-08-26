@@ -802,6 +802,7 @@ Proof.
   - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
 Qed.
 
+(* 5 Step plan *)
 Lemma wf_value_plug : forall K e,
   is_value_b (Plug K e) = true ->
   wfKctx K.
@@ -835,41 +836,46 @@ Proof.
   simpl in Hprime. rewrite Hp in Hprime. rewrite H0 in Hprime. rewrite H1 in Hprime. rewrite <- Hprime.
   simpl. inversion H; subst. reflexivity. inversion H.
   (* k + 1 case goes/starts here *)
-
-
-  simpl. destruct (is_value_b e) eqn:Hiv.
-  - simpl. destruct (is_value_b (Plug K e)) eqn:Hp.
-    + apply H.
-    + inversion H.
-  - simpl. 
-  (* k + 1 case *)
-  - specialize H as ORIGINAL.
-    simpl in H0.
-    (* if e is a value *)
-    destruct (is_value_b e) eqn:Hvv.
-    inversion H0; subst.
-    (* destruct case 1 *)
-    simpl in H. destruct (is_value_b (Plug K e)) eqn:Hh. inversion H; subst. simpl. rewrite Hh; simpl. reflexivity.
-    simpl. rewrite Hh. apply H.
-    (* destruct case 2 : assume e is NOT a value *)
-    assert (exists K r, e = (Plug K r)). admit. destruct H1; destruct H1.
-    assert (exec (S k) (Plug K e) memory s = exec (S k) (Plug K (Plug x x0)) memory s). rewrite H1. reflexivity.
-    assert (forall d, reduce x0 memory s = Some d-> exec (S k) (Plug K (Plug x x0)) memory s = 
-                      (uniform_bind d (fun '(e', m', s') => (exec k (Plug K (Plug x e')) m' s')))). admit.
-    assert (forall d D', ((fun '(e', m', s') => (exec k (Plug x e') m' s')) D') = Some d ->
-                         ((fun '(e', m', s') => (exec k (Plug K (Plug x e')) m' s')) D') = 
-                         (uniform_bind d (fun '(e'', m'', s'') => (exec k (Plug K (Plug x e'')) m'' s'')))). admit.
+  (* e is a value *)
+  destruct (unique_decomposition e). destruct H0.
+  - assert (exec (S k) (Plug K e) memory s  = 
+            uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
+    simpl. simpl in H. destruct (is_value_b (Plug K e)). reflexivity. reflexivity.
+    assert (uniform_bind (Some (ret (e, memory, s)))
+              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s') =
+            uniform_bind (exec (S k) e memory s)
+              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s')).
+    simpl. simpl in H. destruct (is_value_b (Plug K e)) eqn:Hj. rewrite H0. simpl. rewrite Hj. reflexivity. 
+    destruct (decompose (Plug K e)) eqn:Hdes. simpl. destruct p. rewrite H0. simpl. rewrite Hj. rewrite Hdes. reflexivity. inversion H.
+    rewrite <- H. rewrite H2. rewrite H3. reflexivity.
+  (*e is not a value *)
+  - specialize (eq_decompose) as Hded.
+    destruct H0. destruct H1 as [K0]. destruct H1 as [r].
+    specialize (Hded e K0 r H1). rewrite Hded in H.
+    assert (exec (S k) (Plug K (Plug K0 r)) memory s =
+            uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s'))).
+    admit.
     
-    specialize (unique_decomposition e) as Hud. destruct Hud. destruct H1.
-    rewrite H1 in Hvv. inversion Hvv.
-    destruct H1. destruct H2. destruct H2. rewrite H2 in H0. 
-    destruct (reduce x0 memory s) eqn:Hre. 
-    simpl in H. destruct (is_value_b (Plug K e)) eqn:His.
-    inversion H; subst. admit.
-    (* main case *)
-    specialize (unique_decomposition (Plug K e)) as Hud2. destruct Hud2. destruct H3. rewrite H3 in His. inversion His.
-    destruct H3. destruct H4. destruct H4. rewrite H4 in H. destruct (reduce x2 memory s) eqn:Hrd. admit.
-    inversion H. inversion H0. 
+    assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s')) =
+            uniform_bind (reduce r memory s) (fun '(e', m', s') => 
+                                                    (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s''))))).
+    admit.
+    assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s'')))) =
+            uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
+    admit.
+    assert (uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
+            uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
+    admit.
+    assert (uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
+            uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
+    admit.
+    rewrite <- H.
+    rewrite H2.
+    rewrite H3.
+    rewrite H4.
+    rewrite H5.
+    rewrite H6.
+    reflexivity.
 Admitted.
 
 (** TODO:
