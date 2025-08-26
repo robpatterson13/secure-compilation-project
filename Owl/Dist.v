@@ -266,6 +266,55 @@ Qed.
   |= (x <- c1 ;; k1 x) ~ (y <- c2 ;; k2 x) { Q }.
 *)
 
+Fixpoint uniform_bind_core {A B}
+         (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
+  match c with
+  | Ret x => k x
+  | Flip f =>
+      match uniform_bind_core (f false) k,
+            uniform_bind_core (f true)  k with
+      | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
+      | _, _ => None
+      end
+  end.
 
+Definition uniform_bind {A B}
+           (co : option (Dist A)) (k : A -> option (Dist B)) : option (Dist B) :=
+  match co with
+  | None => None
+  | Some c => uniform_bind_core c k
+  end.
+
+Lemma uniform_bind_ext_on {A B}
+  (d : Dist A) (K1 K2 : A -> option (Dist B)) :
+  (forall x, inSupport d x -> K1 x = K2 x) ->
+  uniform_bind (Some d) K1 = uniform_bind (Some d) K2.
+Proof.
+  intros.
+  induction d.
+  - simpl. specialize (H a).
+    simpl in H. apply H. reflexivity.
+  - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl.
+    specialize (Hf (fun x hx => H x (or_introl hx))) as Ef1. (* VERY USEFUL TOOLS *)
+    specialize (Ht (fun x hx => H x (or_intror hx))) as Et1.
+    unfold uniform_bind in Ef1. unfold uniform_bind in Et1.
+    rewrite Ef1. rewrite Et1. reflexivity.
+Qed.
+
+Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
+  uniform_bind (Some c) k = Some d' ->
+  forall x, inSupport c x -> exists d'', k x = Some d''.
+Proof.
+  revert k d'.
+  induction c; intros k d' Hb x Hsup; simpl in *.
+  - subst. eexists. exact Hb.
+  - destruct (uniform_bind_core (d false) k) eqn:Hf0;
+    destruct (uniform_bind_core (d true)  k) eqn:Hf1;
+    try discriminate Hb.
+    inversion Hb; subst; clear Hb.
+    destruct Hsup.
+    + eapply H. apply Hf0. assumption.
+    + eapply H. apply Hf1. assumption.
+Qed. 
 
 

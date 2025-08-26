@@ -590,25 +590,6 @@ Proof.
   (* Tedious, finish later *)
  Admitted.
 
-Fixpoint uniform_bind_core {A B}
-         (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
-  match c with
-  | Ret x => k x
-  | Flip f =>
-      match uniform_bind_core (f false) k,
-            uniform_bind_core (f true)  k with
-      | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
-      | _, _ => None
-      end
-  end.
-
-Definition uniform_bind {A B}
-           (co : option (Dist A)) (k : A -> option (Dist B)) : option (Dist B) :=
-  match co with
-  | None => None
-  | Some c => uniform_bind_core c k
-  end.
-
 Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match k with 
   | 0 => if is_value_b e then Some (Ret (e, m, st)) else None
@@ -656,40 +637,6 @@ Proof.
       specialize (IHe e eq_refl eq_refl E k r). apply IHe. apply Hd.
     + inversion H; subst. constructor.
 Admitted.  
-
-(* Move to Dist *)
-Lemma uniform_bind_ext_on {A B}
-  (d : Dist A) (K1 K2 : A -> option (Dist B)) :
-  (forall x, inSupport d x -> K1 x = K2 x) ->
-  uniform_bind (Some d) K1 = uniform_bind (Some d) K2.
-Proof.
-  intros.
-  induction d.
-  - simpl. specialize (H a).
-    simpl in H. apply H. reflexivity.
-  - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl.
-    specialize (Hf (fun x hx => H x (or_introl hx))) as Ef1. (* VERY USEFUL TOOLS *)
-    specialize (Ht (fun x hx => H x (or_intror hx))) as Et1.
-    unfold uniform_bind in Ef1. unfold uniform_bind in Et1.
-    rewrite Ef1. rewrite Et1. reflexivity.
-Qed.
-
-(* Move to Dist *)
-Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
-  uniform_bind (Some c) k = Some d' ->
-  forall x, inSupport c x -> exists d'', k x = Some d''.
-Proof.
-  revert k d'.
-  induction c; intros k d' Hb x Hsup; simpl in *.
-  - subst. eexists. exact Hb.
-  - destruct (uniform_bind_core (d false) k) eqn:Hf0;
-    destruct (uniform_bind_core (d true)  k) eqn:Hf1;
-    try discriminate Hb.
-    inversion Hb; subst; clear Hb.
-    destruct Hsup.
-    + eapply H. apply Hf0. assumption.
-    + eapply H. apply Hf1. assumption.
-Qed. 
 
 Lemma exec_monotonicity : forall k k' e memory s D,
   exec k e memory s = Some D ->
@@ -741,31 +688,6 @@ Proof.
         inversion H.
         inversion H. 
 Qed.
-
-Lemma exec_to_bind : forall e K k r memory s d,
-  is_value_b e = false ->
-  decompose e = Some (K, r) ->
-  reduce r memory s = Some d ->
-  exec (S k) (Plug K r) memory s = uniform_bind (Some d) (fun '(e', m', s') => exec k (Plug K e') m' s').
-Proof.
-  intros. simpl. specialize (eq_decompose e K r H0). 
-  intros. 
-  inversion H2; subst. 
-  rewrite H. 
-  rewrite H0. 
-  rewrite H1. 
-  simpl. 
-  reflexivity.
-Qed.
-
-Lemma exec_to_bind_2 : forall e K K' k r r' memory s d,
-  is_value_b e = false ->
-  decompose e = Some (K, r) ->
-  decompose r = Some (K', r') ->
-  reduce r memory s = Some d ->
-  exec (S k) (Plug K (Plug K' r')) memory s = uniform_bind (Some d) (fun '(e', m', s') => exec k (Plug K (Plug K' e')) m' s').
-Proof.
-Admitted.
 
 Lemma value_of_plug :
   forall K e, wfKctx K -> is_value_b (Plug K e) = true -> is_value_b e = true.
@@ -846,7 +768,8 @@ Proof.
             uniform_bind (exec (S k) e memory s)
               (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s')).
     simpl. simpl in H. destruct (is_value_b (Plug K e)) eqn:Hj. rewrite H0. simpl. rewrite Hj. reflexivity. 
-    destruct (decompose (Plug K e)) eqn:Hdes. simpl. destruct p. rewrite H0. simpl. rewrite Hj. rewrite Hdes. reflexivity. inversion H.
+    destruct (decompose (Plug K e)) eqn:Hdes. simpl. destruct p. rewrite H0. simpl. rewrite Hj. rewrite Hdes. reflexivity. 
+    inversion H.
     rewrite <- H. rewrite H2. rewrite H3. reflexivity.
   (*e is not a value *)
   - specialize (eq_decompose) as Hded.
@@ -855,20 +778,19 @@ Proof.
     assert (exec (S k) (Plug K (Plug K0 r)) memory s =
             uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s'))).
     admit.
-    
     assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s')) =
             uniform_bind (reduce r memory s) (fun '(e', m', s') => 
                                                     (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s''))))).
-    admit.
+    admit.    
     assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s'')))) =
             uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
-    admit.
+    simpl. rewrite Hded in H0. rewrite H0. rewrite Hded in H1. rewrite H1. (* bind associative *) admit.
     assert (uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
             uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
-    admit.
+    rewrite Hded. reflexivity.
     assert (uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
             uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
-    admit.
+    simpl. rewrite H0. rewrite H1. simpl. admit.  
     rewrite <- H.
     rewrite H2.
     rewrite H3.
