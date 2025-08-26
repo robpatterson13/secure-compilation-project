@@ -590,14 +590,24 @@ Proof.
   (* Tedious, finish later *)
  Admitted.
 
-Fixpoint uniform_bind {A} {B} (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
-  match c with 
+Fixpoint uniform_bind_core {A B}
+         (c : Dist A) (k : A -> option (Dist B)) : option (Dist B) :=
+  match c with
   | Ret x => k x
-  | Flip f => 
-    match uniform_bind (f false) k, uniform_bind (f true) k with 
-    | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
-    | _, _ => None end end.
+  | Flip f =>
+      match uniform_bind_core (f false) k,
+            uniform_bind_core (f true)  k with
+      | Some d1, Some d2 => Some (Flip (fun b => if b then d2 else d1))
+      | _, _ => None
+      end
+  end.
 
+Definition uniform_bind {A B}
+           (co : option (Dist A)) (k : A -> option (Dist B)) : option (Dist B) :=
+  match co with
+  | None => None
+  | Some c => uniform_bind_core c k
+  end.
 
 Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match k with 
@@ -608,11 +618,8 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
     match decompose e with 
     | None => None
     | Some (K, r) => 
-        match reduce r m st with 
-        | None => None 
-        | Some D => 
-          uniform_bind D (fun '(e', m', s') => 
-            exec k' (Plug K e') m' s') end end end.
+        uniform_bind (reduce r m st) (fun '(e', m', s') => 
+            exec k' (Plug K e') m' s') end end.
 
 (* Decompose Lemma 2 *)
 Lemma eq_decompose : forall e K r,
@@ -654,7 +661,7 @@ Admitted.
 Lemma uniform_bind_ext_on {A B}
   (d : Dist A) (K1 K2 : A -> option (Dist B)) :
   (forall x, inSupport d x -> K1 x = K2 x) ->
-  uniform_bind d K1 = uniform_bind d K2.
+  uniform_bind (Some d) K1 = uniform_bind (Some d) K2.
 Proof.
   intros.
   induction d.
@@ -663,19 +670,20 @@ Proof.
   - simpl in H. specialize (H0 false) as Hf. specialize (H0 true) as Ht. simpl.
     specialize (Hf (fun x hx => H x (or_introl hx))) as Ef1. (* VERY USEFUL TOOLS *)
     specialize (Ht (fun x hx => H x (or_intror hx))) as Et1.
+    unfold uniform_bind in Ef1. unfold uniform_bind in Et1.
     rewrite Ef1. rewrite Et1. reflexivity.
 Qed.
 
 (* Move to Dist *)
 Lemma uniform_bind_all_some {A B} (c : Dist A) (k : A -> option (Dist B)) d' :
-  uniform_bind c k = Some d' ->
+  uniform_bind (Some c) k = Some d' ->
   forall x, inSupport c x -> exists d'', k x = Some d''.
 Proof.
   revert k d'.
   induction c; intros k d' Hb x Hsup; simpl in *.
   - subst. eexists. exact Hb.
-  - destruct (uniform_bind (d false) k) eqn:Hf0;
-    destruct (uniform_bind (d true)  k) eqn:Hf1;
+  - destruct (uniform_bind_core (d false) k) eqn:Hf0;
+    destruct (uniform_bind_core (d true)  k) eqn:Hf1;
     try discriminate Hb.
     inversion Hb; subst; clear Hb.
     destruct Hsup.
@@ -738,7 +746,7 @@ Lemma exec_to_bind : forall e K k r memory s d,
   is_value_b e = false ->
   decompose e = Some (K, r) ->
   reduce r memory s = Some d ->
-  exec (S k) (Plug K r) memory s = uniform_bind d (fun '(e', m', s') => exec k (Plug K e') m' s').
+  exec (S k) (Plug K r) memory s = uniform_bind (Some d) (fun '(e', m', s') => exec k (Plug K e') m' s').
 Proof.
   intros. simpl. specialize (eq_decompose e K r H0). 
   intros. 
@@ -755,24 +763,85 @@ Lemma exec_to_bind_2 : forall e K K' k r r' memory s d,
   decompose e = Some (K, r) ->
   decompose r = Some (K', r') ->
   reduce r memory s = Some d ->
-  exec (S k) (Plug K (Plug K' r')) memory s = uniform_bind d (fun '(e', m', s') => exec k (Plug K (Plug K' e')) m' s').
+  exec (S k) (Plug K (Plug K' r')) memory s = uniform_bind (Some d) (fun '(e', m', s') => exec k (Plug K (Plug K' e')) m' s').
 Proof.
 Admitted.
 
-Lemma well_bracketed : forall k K e memory s D D',
+Lemma value_of_plug :
+  forall K e, wfKctx K -> is_value_b (Plug K e) = true -> is_value_b e = true.
+Proof.
+  intros K e HK.
+  revert e.
+  induction HK. 
+  - intros e Hv; simpl in Hv; try assumption.
+  - intros e Hv. simpl in Hv. try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. rewrite Hv. specialize (IHHK e').
+    destruct (andb_prop _ _ H0) as [HvK HvE]. specialize (IHHK HvK). apply IHHK.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. rewrite Hv. specialize (IHHK e').
+    destruct (andb_prop _ _ H1) as [HvK HvE]. specialize (IHHK HvE). apply IHHK.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. 
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+    specialize (IHHK e' Hv). rewrite IHHK. rewrite Hv. reflexivity.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+    specialize (IHHK e' Hv). rewrite IHHK. rewrite Hv. reflexivity.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+    specialize (IHHK e' Hv). rewrite IHHK; rewrite Hv. reflexivity.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+Qed.
+
+Lemma wf_value_plug : forall K e,
+  is_value_b (Plug K e) = true ->
+  wfKctx K.
+Proof.
+  intros.
+  revert e H.
+  induction K; try discriminate; try constructor; try simpl in H; try specialize (IHK e H); try apply IHK.
+  - destruct (andb_prop _ _ H) as [HvK HvE].
+    specialize (IHK e HvK). apply IHK.
+  - destruct (andb_prop _ _ H) as [HvK HvE].
+    specialize (IHK e HvE). apply IHK.
+  - destruct (andb_prop _ _ H) as [HvK HvE]. assumption.
+Qed.
+
+Lemma well_bracketed : forall k K e memory s D,
   exec k (Plug K e) memory s = Some D ->
-  exec k e memory s = Some D' -> 
-  (uniform_bind D' (fun '(e', m', s') =>(exec k (Plug K e') m' s'))) = Some D.
+  (uniform_bind (exec k e memory s) (fun '(e', m', s') =>(exec k (Plug K e') m' s'))) = Some D.
 Proof.
   induction k; intros.
   (* k = 0 case *)
   specialize H as Hprime. 
-  simpl in H. simpl in H0.
+  simpl in H.
+  destruct (is_value_b (Plug K e)) eqn:Hp.
+  assert (Some (ret (Plug K e, memory, s)) = uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s'))))).
+  simpl. reflexivity.
+  assert (uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s')))) =
+          uniform_bind (exec 0 e memory s) (fun '(e', m', s') => (exec 0 (Plug K e') m' s'))).
+  simpl. specialize (value_of_plug K e) as Hpl.
+  specialize (wf_value_plug K e Hp) as Hwfv.
+  specialize (Hpl Hwfv Hp). rewrite Hpl. simpl. rewrite Hp. reflexivity.
+  simpl in Hprime. rewrite Hp in Hprime. rewrite H0 in Hprime. rewrite H1 in Hprime. rewrite <- Hprime.
+  simpl. inversion H; subst. reflexivity. inversion H.
+  (* k + 1 case goes/starts here *)
+
+
   simpl. destruct (is_value_b e) eqn:Hiv.
-  - inversion H0; subst. simpl. destruct (is_value_b (Plug K e)) eqn:Hp.
+  - simpl. destruct (is_value_b (Plug K e)) eqn:Hp.
     + apply H.
     + inversion H.
-  - inversion H0; subst.
+  - simpl. 
   (* k + 1 case *)
   - specialize H as ORIGINAL.
     simpl in H0.
@@ -791,10 +860,6 @@ Proof.
                          ((fun '(e', m', s') => (exec k (Plug K (Plug x e')) m' s')) D') = 
                          (uniform_bind d (fun '(e'', m'', s'') => (exec k (Plug K (Plug x e'')) m'' s'')))). admit.
     
-    
-
-
-
     specialize (unique_decomposition e) as Hud. destruct Hud. destruct H1.
     rewrite H1 in Hvv. inversion Hvv.
     destruct H1. destruct H2. destruct H2. rewrite H2 in H0. 
