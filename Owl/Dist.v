@@ -320,7 +320,7 @@ Proof.
   reflexivity.
 Qed.
 
-Definition dbind {A B} (c : Dist A) (k : forall x, inSupport c x -> Dist B) : Dist B.
+Fixpoint dbind {A B} (c : Dist A) (k : forall x, inSupport c x -> Dist B) : Dist B.
   destruct c.
   simpl in k.
   apply (k a eq_refl).
