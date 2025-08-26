@@ -673,7 +673,7 @@ Proof.
           fun x1 =>
             let '(p,s') := x1 in let '(e',m') := p in
             exec k' (Plug x e') m' s').
-        specialize (uniform_bind_ext_on d K2 K1) as Hun.
+        specialize (uniform_bind_ext_on (Some d) K2 K1) as Hun.
         assert ((forall x : tm 0 0 * mem 0 0 * binary, inSupport d x -> K2 x = K1 x)) as Hfar. {
           intros x1 Hin.
           destruct x1 as [[e' m'] s'].
@@ -775,22 +775,50 @@ Proof.
   - specialize (eq_decompose) as Hded.
     destruct H0. destruct H1 as [K0]. destruct H1 as [r].
     specialize (Hded e K0 r H1). rewrite Hded in H.
+    (* step 1 *)
     assert (exec (S k) (Plug K (Plug K0 r)) memory s =
             uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s'))).
     admit.
+    (* step 2 *)
     assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s')) =
             uniform_bind (reduce r memory s) (fun '(e', m', s') => 
                                                     (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s''))))).
-    admit.    
-    assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s'')))) =
-            uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
+    admit.
+    (* step 3 *)    
+    assert (uniform_bind (reduce r memory s) 
+                         (fun '(e', m', s') => 
+                                (uniform_bind (exec k (Plug K0 e') m' s') 
+                                              (fun '(e'', m'', s'') => 
+                                                     (exec k (Plug K e'') m'' s'')))) =
+            uniform_bind (exec (S k) (Plug K0 r) memory s) 
+                         (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
     simpl. rewrite Hded in H0. rewrite H0. rewrite Hded in H1. rewrite H1. (* bind associative *) admit.
+    (* step 4 *)
     assert (uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
             uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
     rewrite Hded. reflexivity.
+    (* step 5 *)
     assert (uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
             uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
-    simpl. rewrite H0. rewrite H1. simpl. admit.  
+    specialize (uniform_bind_ext_on (exec (S k) e memory s)
+                  (fun '(e', m', s') => (exec k (Plug K e') m' s')) 
+                  (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))) as Hi.
+    apply Hi. intros.
+    assert ((forall x : tm 0 0 * mem 0 0 * binary,
+              inSupportUniform (exec (S k) e memory s) x ->
+              (fun '(p, s') => let '(e', m') := p in exec k (Plug K e') m' s') x =
+              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s') x)).
+    intros. 
+    rewrite H2 in H.
+    rewrite H3 in H.
+    rewrite H4 in H.
+    rewrite H5 in H.
+    specialize (uniform_bind_all_some (exec (S k) e memory s)
+                  (fun '(p, s') => let '(e', m') := p in exec k (Plug K e') m' s') D H x0 H7) as Hsus.
+    destruct Hsus. destruct x0. destruct p.
+    specialize (exec_monotonicity k (S k) (Plug K t) m b x1 H8) as Hem.
+    assert (S k >= k). lia. specialize (Hem H9). symmetry in Hem. apply Hem.
+    specialize (H7 x H6). simpl in H7. simpl. apply H7.
     rewrite <- H.
     rewrite H2.
     rewrite H3.
@@ -801,12 +829,13 @@ Proof.
 Admitted.
 
 (** TODO:
-  - Move uniform_bind into Dist.v TBD but EASY
+  - Move uniform_bind into Dist.v DONE
   - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) SORT OF Done
-  - Encoding the adversary TBD
+  - Encoding the adversary TBD, easy but I've got bigger fish to fry
   - Finish reduce; get rid of Inductive versions DONE
   - Do monotonicity lemma DONE
-  - Well-bracketed lemma TBD *)
+  - Well-bracketed lemma TBD 
+  - Make Op binary TBD *)
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
