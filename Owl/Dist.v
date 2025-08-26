@@ -194,11 +194,11 @@ Proof.
   - apply H.
 Qed. 
 
-Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) : Prop :=
-  exists (c : Dist (A * B)), 
+Definition coupling {A} {B} (R : A -> B -> Prop) (d1 : Dist A) (d2 : Dist B) :=
+{c : Dist (A * B) | 
     d1 ~= (x <- c ;; Ret (fst x)) /\
     d2 ~= (x <- c ;; Ret (snd x)) /\
-    |= c { fun '(x, y) => R x y }.
+    |= c { fun '(x, y) => R x y } }.
 
 Notation "|= c ~ d { P }" := (coupling P c d) (at level 60, d at level 0, c at level 0, P at level 0).
 
@@ -243,8 +243,8 @@ Lemma coupling_eq {A} (d1 d2 : Dist A) :
   d1 ~= d2.
 Proof.
   intros.
-  unfold eqDist. unfold coupling in H.
-  destruct H. destruct H. destruct H0.
+  unfold eqDist. unfold coupling in X.
+  destruct X. destruct a. destruct H0.
   intros. 
   unfold eqDist in H. specialize (H x0).
   unfold eqDist in H0. specialize (H0 x0).
@@ -260,6 +260,37 @@ Proof.
   intros.
   reflexivity.
 Qed.
+
+Fixpoint dbind {A B} (c : Dist A) (k : forall x, inSupport c x -> Dist B) : Dist B.
+  destruct c.
+  simpl in k.
+  apply (k a eq_refl).
+  simpl in *.
+  refine (Flip (fun b => dbind _ _ (d b) (fun x h => k x _))).
+  destruct b.
+  right; apply h.
+  left; apply h.
+Defined.
+
+
+Lemma coupling_bind {A B C D} (d1 : Dist A) (d2 : Dist B) (k1 : A -> Dist C) (k2 : B -> Dist D) r1 r2 : 
+  coupling r1 d1 d2 ->
+  (forall x y, r1 x y -> coupling r2 (k1 x) (k2 y)) ->
+  coupling r2 (x <- d1 ;; k1 x) (x <- d2 ;; k2 x).
+  intros.
+  assert (H : forall x, inSupport (proj1_sig X) x -> r1 (fst x) (snd x)).
+  destruct X.
+  destruct a.
+  destruct a.
+  simpl.
+  intros.
+  specialize (v x0).
+  simpl in v.
+  destruct x0; simpl in *.
+  apply v; auto.
+
+  exists (dbind (proj1_sig X) (fun '(x, y) h => proj1_sig (X0 x y (H (x, y) h)))).
+Admitted.
 
 (* TODO: the natural rule for bind: if |= c1 ~ c2 { R }, and if forall x and y,  
   R x y implies |= (k1 x) ~ (k2 y) { Q }, then 
