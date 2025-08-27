@@ -320,7 +320,7 @@ Proof.
   reflexivity.
 Qed.
 
-Fixpoint dbind {A B} (c : Dist A) (k : forall x, inSupport c x -> Dist B) : Dist B.
+(* Fixpoint dbind {A B} (c : Dist A) (k : forall x, inSupport c x -> Dist B) : Dist B.
   destruct c.
   simpl in k.
   apply (k a eq_refl).
@@ -348,7 +348,7 @@ Lemma coupling_bind {A B C D} (d1 : Dist A) (d2 : Dist B) (k1 : A -> Dist C) (k2
   apply v; auto.
 
   exists (dbind (proj1_sig X) (fun '(x, y) h => proj1_sig (X0 x y (H (x, y) h)))).
-Admitted.
+Admitted. *)
 
 (* TODO: the natural rule for bind: if |= c1 ~ c2 { R }, and if forall x and y,  
   R x y implies |= (k1 x) ~ (k2 y) { Q }, then 
