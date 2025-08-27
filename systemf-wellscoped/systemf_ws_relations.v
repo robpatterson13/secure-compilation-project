@@ -65,6 +65,7 @@ Definition empty_gamma (delta : delta_context) : gamma_context delta 0 :=
                               (vt (var_vl (shift var_zero))))))))))) 
                             (all (arr (var_ty var_zero) (all (arr (var_ty var_zero) (var_ty (shift var_zero))))))).
 Proof.
+  Check var_zero.
   repeat constructor.
   specialize (T_Var) as funny.
   specialize (funny 2 2 (scons (var_ty var_zero) (lift_gamma (scons (var_ty var_zero) (lift_gamma (empty_gamma 0))))) (shift var_zero)).
