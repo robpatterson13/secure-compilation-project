@@ -7,9 +7,6 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
-Record Adv := {
-}.
-
 (* l for label variables in scope *)
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
@@ -266,7 +263,7 @@ Inductive wfKctx {l m} : (@Kctx l m) -> Prop :=
 | wfIf : forall K e1 e2, wfKctx K -> wfKctx (KIf K e1 e2)
 | wfSync : forall K, wfKctx K -> wfKctx (KSync K)
 | wfOpL : forall f K e, wfKctx K -> wfKctx (KOpL f K e)
-| wfOpR : forall f K v, wfKctx K -> is_value_b v = true -> wfKctx (KOpR f v K). 
+| wfOpR : forall f K v, wfKctx K -> is_value_b v = true -> wfKctx (KOpR f v K).
 
 (* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
@@ -312,6 +309,14 @@ Definition allocate {l m} (location : nat) (v : tm l m) (memory : mem l m) : (me
     else memory i.
 
 Parameter fresh : forall {l m}, mem l m -> nat.
+
+(* Encode this adversary... *)
+Record Adv := {
+  Arounds : binary -> nat;
+  Ainit {l m} : binary -> Dist (@Kctx l m * (mem l m) * binary);
+  Async : binary * binary -> Dist (binary * binary);
+  Adecide : binary -> Dist binary;
+}.
 
 Definition convert_to_bitstring (l d : nat) (bs : binary) : tm l d :=
    (bitstring bs).
