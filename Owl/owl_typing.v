@@ -334,7 +334,7 @@ Definition extract_argument (e1 : tm 0 0) : option binary :=
   | _ => None
   end.
 
-Definition reduce (t : tm 0 0) (memory : mem 0 0) (s : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
+Definition reduce (a : Adv) (t : tm 0 0) (memory : mem 0 0) (s : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match t with 
   | zero (bitstring b) => Some (Ret ((bitstring (generate_zero b)), memory, s))
   | if_tm (bitstring b) e1 e2 => if all_zero_b b then Some (Ret (e1, memory, s)) else Some (Ret (e2, memory, s))
@@ -361,6 +361,7 @@ Definition reduce (t : tm 0 0) (memory : mem 0 0) (s : binary) : option (Dist (t
       match extract_argument e2 with
       | None => None
       | Some b2 => Some (x <- (f b1 b2) ;; Ret (bitstring x, memory, s)) end end
+  | sync (bitstring b) => Some (x <- (a.(Async) (b, s));; Ret (bitstring (fst x), memory, s))
   | _ => None
   end.
 
