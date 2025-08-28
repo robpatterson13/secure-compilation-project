@@ -314,9 +314,18 @@ Parameter fresh : forall {l m}, mem l m -> nat.
 Record Adv := {
   Arounds : binary -> nat;
   Ainit {l m} : binary -> Dist (@Kctx l m * (mem l m) * binary);
-  Async : binary * binary -> Dist (binary * binary);
+  Async : (binary * binary) -> Dist (binary * binary);
   Adecide : binary -> Dist binary;
 }.
+
+
+Definition fake_adv : Adv :=
+  {|
+    Arounds := (fun x => 999);
+    Ainit := (fun l m x => Ret (KHole, test_mem l m, x));
+    Async := (fun '(x, y) => Ret (x, y));
+    Adecide := (fun x => Ret (x))
+  |}.
 
 Definition convert_to_bitstring (l d : nat) (bs : binary) : tm l d :=
    (bitstring bs).
@@ -366,7 +375,7 @@ Definition reduce (a : Adv) (t : tm 0 0) (memory : mem 0 0) (s : binary) : optio
   end.
 
 Lemma test_reduce : forall (memory : mem 0 0) s, 
-  reduce (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
+  reduce fake_adv (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
   intros.
   simpl. reflexivity.
@@ -567,7 +576,7 @@ Proof.
   (* Tedious, finish later *)
  Admitted.
 
-Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
+Fixpoint exec (a : Adv) (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist (tm 0 0 * mem 0 0 * binary)) :=
   match k with 
   | 0 => if is_value_b e then Some (Ret (e, m, st)) else None
   | S k' => 
@@ -576,8 +585,8 @@ Fixpoint exec (k : nat) (e : tm 0 0) (m : mem 0 0) (st : binary) : option (Dist 
     match decompose e with 
     | None => None
     | Some (K, r) => 
-        uniform_bind (reduce r m st) (fun '(e', m', s') => 
-            exec k' (Plug K e') m' s') end end.
+        uniform_bind (reduce a r m st) (fun '(e', m', s') => 
+            exec a k' (Plug K e') m' s') end end.
 
 (* Decompose Lemma 2 *)
 Lemma eq_decompose : forall e K r,
@@ -611,10 +620,10 @@ Proof.
     + inversion H; subst. constructor.
 Admitted.  
 
-Lemma exec_monotonicity : forall k k' e memory s D,
-  exec k e memory s = Some D ->
+Lemma exec_monotonicity : forall a k k' e memory s D,
+  exec a k e memory s = Some D ->
   k' >= k ->
-  exec k' e memory s = exec k e memory s.
+  exec a k' e memory s = exec a k e memory s.
 Proof.
   intros.
   revert e memory s D k' H0 H.
@@ -637,15 +646,15 @@ Proof.
           rewrite Hd in H2. apply H2.
         }
         rewrite Hkn in HP. inversion HP; subst. 
-        destruct (reduce x0 memory s) eqn:Hre. fold exec in H.
+        destruct (reduce a x0 memory s) eqn:Hre. fold exec in H.
         set (K1 :=
           fun x1 =>
             let '(p,s') := x1 in let '(e',m') := p in
-            exec k  (Plug x e') m' s').
+            exec a k  (Plug x e') m' s').
         set (K2 :=
           fun x1 =>
             let '(p,s') := x1 in let '(e',m') := p in
-            exec k' (Plug x e') m' s').
+            exec a k' (Plug x e') m' s').
         specialize (uniform_bind_ext_on (Some d) K2 K1) as Hun.
         assert ((forall x : tm 0 0 * mem 0 0 * binary, inSupport d x -> K2 x = K1 x)) as Hfar. {
           intros x1 Hin.
@@ -656,7 +665,7 @@ Proof.
           exact IHk.
         }
         specialize (Hun Hfar). unfold K2 in Hun. unfold K1 in Hun. rewrite <- Hun in H.
-        unfold exec. rewrite H1. rewrite H2. destruct (reduce x0 memory s). fold exec.
+        unfold exec. rewrite H1. rewrite H2. destruct (reduce a x0 memory s). fold exec.
         inversion Hre; subst. apply Hun. reflexivity.
         inversion H.
         inversion H. 
@@ -763,10 +772,10 @@ Proof.
 Admitted.
 
 (* 5 Step plan *)
-Lemma well_bracketed : forall k K e memory s D,
+Lemma well_bracketed : forall a k K e memory s D,
   wfKctx K -> (* This is needed since K may not always be well formed *)
-  exec k (Plug K e) memory s = Some D ->
-  (uniform_bind (exec k e memory s) (fun '(e', m', s') =>(exec k (Plug K e') m' s'))) = Some D.
+  exec a k (Plug K e) memory s = Some D ->
+  (uniform_bind (exec a k e memory s) (fun '(e', m', s') =>(exec a k (Plug K e') m' s'))) = Some D.
 Proof.
   induction k; intros K e memory s D H' H.
   (* k = 0 case *)
@@ -777,7 +786,7 @@ Proof.
           uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s'))))).
   simpl. reflexivity.
   assert (uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s')))) =
-          uniform_bind (exec 0 e memory s) (fun '(e', m', s') => (exec 0 (Plug K e') m' s'))).
+          uniform_bind (exec a 0 e memory s) (fun '(e', m', s') => (exec a 0 (Plug K e') m' s'))).
   simpl. specialize (value_of_plug K e) as Hpl.
   specialize (wf_value_plug K e Hp) as Hwfv.
   specialize (Hpl Hwfv Hp). rewrite Hpl. simpl. rewrite Hp. reflexivity.
@@ -786,13 +795,13 @@ Proof.
   (* k + 1 case goes/starts here *)
   (* e is a value *)
   destruct (unique_decomposition e). destruct H0.
-  - assert (exec (S k) (Plug K e) memory s  = 
-            uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
+  - assert (exec a (S k) (Plug K e) memory s  = 
+            uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (exec a (S k) (Plug K e') m' s'))).
     simpl. simpl in H. destruct (is_value_b (Plug K e)). reflexivity. reflexivity.
     assert (uniform_bind (Some (ret (e, memory, s)))
-              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s') =
-            uniform_bind (exec (S k) e memory s)
-              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s')).
+              (fun '(p, s') => let '(e', m') := p in exec a (S k) (Plug K e') m' s') =
+            uniform_bind (exec a (S k) e memory s)
+              (fun '(p, s') => let '(e', m') := p in exec a (S k) (Plug K e') m' s')).
     simpl. simpl in H. destruct (is_value_b (Plug K e)) eqn:Hj. rewrite H0. simpl. rewrite Hj. reflexivity. 
     destruct (decompose (Plug K e)) eqn:Hdes. simpl. destruct p. rewrite H0. simpl. rewrite Hj. rewrite Hdes. reflexivity. 
     inversion H.
@@ -802,31 +811,30 @@ Proof.
     destruct H0. destruct H1 as [K0]. destruct H1 as [r].
     specialize (Hded e K0 r H1). rewrite Hded in H.
     (* step 1 *)
-    assert (exec (S k) (Plug K (Plug K0 r)) memory s =
-            uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s'))).
+    assert (exec a (S k) (Plug K (Plug K0 r)) memory s =
+            uniform_bind (reduce a r memory s) (fun '(e', m', s') => (exec a k (Plug K (Plug K0 e')) m' s'))).
     rewrite Hded in *.
     unfold exec at 1.
     destruct (is_value_b (Plug K (Plug K0 r))) eqn:Hy.
     specialize (wf_value_plug K (Plug K0 r) Hy). intros.
     specialize (value_of_plug K (Plug K0 r) H2 Hy). intros.
     rewrite H3 in H0. inversion H0.
-
     rewrite (decompose_plug K _ _ _ H' H1).
     f_equal.
     apply functional_extensionality. intros. 
     destruct x; simpl. fold exec. destruct p; simpl.
     rewrite Plug_comp. reflexivity.
     (* step 2 - Inductive - *)
-    assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s')) =
-            uniform_bind (reduce r memory s) (fun '(e', m', s') => 
-                                                    (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s''))))).
+    assert (uniform_bind (reduce a r memory s) (fun '(e', m', s') => (exec a k (Plug K (Plug K0 e')) m' s')) =
+            uniform_bind (reduce a r memory s) (fun '(e', m', s') => 
+                                                    (uniform_bind (exec a k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec a k (Plug K e'') m'' s''))))).
     set (K2 :=
-        fun '(p,s') => let '(e',m') := p in exec k (Plug K (Plug K0 e')) m' s').
+        fun '(p,s') => let '(e',m') := p in exec a k (Plug K (Plug K0 e')) m' s').
     set (K1 :=
         fun '(p,s') => let '(e',m') := p in
-          uniform_bind (exec k (Plug K0 e') m' s')
-            (fun '(p0,s'') => let '(e'',m'') := p0 in exec k (Plug K e'') m'' s'')).
-    assert (uniform_bind (reduce r memory s) K2 = Some D). unfold K2. rewrite <- H2. apply H.
+          uniform_bind (exec a k (Plug K0 e') m' s')
+            (fun '(p0,s'') => let '(e'',m'') := p0 in exec a k (Plug K e'') m'' s'')).
+    assert (uniform_bind (reduce a r memory s) K2 = Some D). unfold K2. rewrite <- H2. apply H.
     eapply uniform_bind_ext_on. intros [[e' m'] s'] Hin.
     destruct (uniform_bind_all_some _ _ _ H3 _ Hin) as [Dleaf HK2x].
     specialize (IHk K (Plug K0 e') m' s' Dleaf). 
@@ -835,52 +843,52 @@ Proof.
     rewrite <- IHk in HK2x. 
     apply HK2x. 
     (* step 3 *)    
-    assert (uniform_bind (reduce r memory s) 
+    assert (uniform_bind (reduce a r memory s) 
                          (fun '(e', m', s') => 
-                                (uniform_bind (exec k (Plug K0 e') m' s') 
+                                (uniform_bind (exec a k (Plug K0 e') m' s') 
                                               (fun '(e'', m'', s'') => 
-                                                     (exec k (Plug K e'') m'' s'')))) =
-            uniform_bind (exec (S k) (Plug K0 r) memory s) 
-                         (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
+                                                     (exec a k (Plug K e'') m'' s'')))) =
+            uniform_bind (exec a (S k) (Plug K0 r) memory s) 
+                         (fun '(e', m', s') => (exec a k (Plug K e') m' s'))).
     simpl. rewrite Hded in H0. rewrite H0. rewrite Hded in H1. rewrite H1.
     set (K1 :=
       fun '(p,s') =>
-        let '(e',m') := p in exec k (Plug K0 e') m' s'). 
+        let '(e',m') := p in exec a k (Plug K0 e') m' s'). 
     set (K2 :=
       fun '(p0,s'') =>
-        let '(e'',m'') := p0 in exec k (Plug K e'') m'' s'').
-    specialize (uniform_bind_assoc (reduce r memory s) K1 K2) as Hassoc.
+        let '(e'',m'') := p0 in exec a k (Plug K e'') m'' s'').
+    specialize (uniform_bind_assoc (reduce a r memory s) K1 K2) as Hassoc.
     rewrite <- Hassoc.
-    assert ((fun '(p, s') => let '(e', m') := p in uniform_bind (exec k (Plug K0 e') m' s') K2) =
+    assert ((fun '(p, s') => let '(e', m') := p in uniform_bind (exec a k (Plug K0 e') m' s') K2) =
             (fun a : tm 0 0 * mem 0 0 * binary => uniform_bind (K1 a) K2)).
     apply functional_extensionality.
     intros.
     destruct x. destruct p. unfold K1. reflexivity.
     rewrite H4. reflexivity.
     (* step 4 *)
-    assert (uniform_bind (exec (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
-            uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s'))).
+    assert (uniform_bind (exec a (S k) (Plug K0 r) memory s) (fun '(e', m', s') => (exec a k (Plug K e') m' s')) =
+            uniform_bind (exec a (S k) e memory s) (fun '(e', m', s') => (exec a k (Plug K e') m' s'))).
     rewrite Hded. reflexivity.
     (* step 5 *)
-    assert (uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec k (Plug K e') m' s')) =
-            uniform_bind (exec (S k) e memory s) (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))).
-    specialize (uniform_bind_ext_on (exec (S k) e memory s)
-                  (fun '(e', m', s') => (exec k (Plug K e') m' s')) 
-                  (fun '(e', m', s') => (exec (S k) (Plug K e') m' s'))) as Hi.
+    assert (uniform_bind (exec a (S k) e memory s) (fun '(e', m', s') => (exec a k (Plug K e') m' s')) =
+            uniform_bind (exec a (S k) e memory s) (fun '(e', m', s') => (exec a (S k) (Plug K e') m' s'))).
+    specialize (uniform_bind_ext_on (exec a (S k) e memory s)
+                  (fun '(e', m', s') => (exec a k (Plug K e') m' s')) 
+                  (fun '(e', m', s') => (exec a (S k) (Plug K e') m' s'))) as Hi.
     apply Hi. intros.
     assert ((forall x : tm 0 0 * mem 0 0 * binary,
-              inSupportUniform (exec (S k) e memory s) x ->
-              (fun '(p, s') => let '(e', m') := p in exec k (Plug K e') m' s') x =
-              (fun '(p, s') => let '(e', m') := p in exec (S k) (Plug K e') m' s') x)).
+              inSupportUniform (exec a (S k) e memory s) x ->
+              (fun '(p, s') => let '(e', m') := p in exec a k (Plug K e') m' s') x =
+              (fun '(p, s') => let '(e', m') := p in exec a (S k) (Plug K e') m' s') x)).
     intros. 
     rewrite H2 in H.
     rewrite H3 in H.
     rewrite H4 in H.
     rewrite H5 in H.
-    specialize (uniform_bind_all_some (exec (S k) e memory s)
-                  (fun '(p, s') => let '(e', m') := p in exec k (Plug K e') m' s') D H x0 H7) as Hsus.
+    specialize (uniform_bind_all_some (exec a (S k) e memory s)
+                  (fun '(p, s') => let '(e', m') := p in exec a k (Plug K e') m' s') D H x0 H7) as Hsus.
     destruct Hsus. destruct x0. destruct p.
-    specialize (exec_monotonicity k (S k) (Plug K t) m b x1 H8) as Hem.
+    specialize (exec_monotonicity a k (S k) (Plug K t) m b x1 H8) as Hem.
     assert (S k >= k). lia. specialize (Hem H9). symmetry in Hem. apply Hem.
     specialize (H7 x H6). simpl in H7. simpl. apply H7.
     (* Wrap up the chain via rewrites *)
@@ -943,7 +951,7 @@ Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus (bitstring (bone (bone be
 
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma coin_test : forall memory s,
-  exec 100 coin_Op memory s = Some (Flip (fun b => ret (bitstring (if b then bone bend else bzero bend), memory, s))).
+  exec fake_adv 100 coin_Op memory s = Some (Flip (fun b => ret (bitstring (if b then bone bend else bzero bend), memory, s))).
 Proof.
   intros.
   simpl.
@@ -955,7 +963,7 @@ Qed.
 
 Lemma exec_coin_Op_plus :
   forall (memory : mem 0 0) s,
-    exec 10 (zero coin_Op_plus) memory s = Some
+    exec fake_adv 10 (zero coin_Op_plus) memory s = Some
              (Flip (fun b =>
                       ret (bitstring (if b then (bzero (bzero bend)) else bzero bend), memory, s))).
 Proof.
@@ -969,7 +977,7 @@ Qed.
 
 Lemma test_exec :
   forall (memory : mem 0 0) s,
-    exec 10 (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
+    exec fake_adv 10 (zero (bitstring (bone (bone bend)))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
   intros.
   simpl. 
@@ -978,7 +986,7 @@ Qed.
 
 Lemma test_exec_2 :
   forall (memory : mem 0 0) s,
-    exec 10 (zero (zero (bitstring (bone (bone bend))))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
+    exec fake_adv 10 (zero (zero (bitstring (bone (bone bend))))) memory s = Some (ret ((bitstring (bzero (bzero bend))), memory, s)).
 Proof.
   intros.
   simpl.
@@ -987,7 +995,7 @@ Qed.
   
 Lemma test_error :
   forall (memory : mem 0 0) s,
-    exec 5 (zero skip) memory s = None.
+    exec fake_adv 5 (zero skip) memory s = None.
 Proof.
   intros.
   simpl.
