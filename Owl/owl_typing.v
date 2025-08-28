@@ -211,7 +211,8 @@ Inductive Kctx {l m : nat} :=
 | KUnpack : Kctx -> tm l (S m) -> Kctx
 | KIf : Kctx -> tm l m -> tm l m -> Kctx
 | KSync : Kctx -> Kctx
-| KOp : op -> list (tm l m) -> Kctx -> list (tm l m) -> Kctx.
+| KOpL : op ->  Kctx -> tm l m -> Kctx
+| KOpR : op -> tm l m -> Kctx -> Kctx.
 
 (* Plug a term into the expression context K to get a resulting term *)
 Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
@@ -237,7 +238,8 @@ Fixpoint Plug { l m } (K : Kctx) (t : tm l m) : (tm l m) :=
    | KUnpack  K' e => (unpack (Plug K' t) e)
    | KIf K' e1 e2 => (if_tm (Plug K' t) e1 e2)
    | KSync K' => (sync (Plug K' t))
-   | KOp f vs K' es => Op f (vs ++ Plug K' t :: es)
+   | KOpL f K' e => Op f (Plug K' t) e
+   | KOpR f v K' => Op f v (Plug K' t)
    end.
 
 (* Peace of mind for later on *)
@@ -263,20 +265,8 @@ Inductive wfKctx {l m} : (@Kctx l m) -> Prop :=
 | wfUnpack : forall K e, wfKctx K -> wfKctx (KUnpack K e)
 | wfIf : forall K e1 e2, wfKctx K -> wfKctx (KIf K e1 e2)
 | wfSync : forall K, wfKctx K -> wfKctx (KSync K)
-| wfOp : forall f vs K es, 
-  wfKctx K -> 
-  Forall (fun v => is_value_b v = true) vs -> wfKctx (KOp f vs K es).
-
-Fixpoint split_values {l m}
-         (xs : list (tm l m))
-  : list (tm l m) * list (tm l m) :=
-  match xs with
-  | [] => ([], [])
-  | x :: xs' =>
-      if is_value_b x
-      then let (vs, es) := split_values xs' in (x :: vs, es)
-      else ([], xs)
-  end.
+| wfOpL : forall f K e, wfKctx K -> wfKctx (KOpL f K e)
+| wfOpR : forall f K v, wfKctx K -> is_value_b v = true -> wfKctx (KOpR f v K). 
 
 (* generate a bitstring of the form {0}* *)
 Fixpoint generate_zero (b : binary) : binary :=
@@ -333,14 +323,9 @@ Axiom fresh_not_allocated :
 
 (* NEW STUFF TO WORK THROUGH *)
 
-Fixpoint extract_arguments (es : list (tm 0 0)) : option (list binary) :=
-  match es with
-  | [] => Some []
-  | bitstring b :: es' =>
-      match extract_arguments es' with
-      | Some bs => Some (b :: bs)
-      | None => None
-      end
+Definition extract_argument (e1 : tm 0 0) : option binary :=
+  match e1 with
+  | bitstring b => Some b
   | _ => None
   end.
 
@@ -364,10 +349,13 @@ Definition reduce (t : tm 0 0) (memory : mem 0 0) (s : binary) : option (Dist (t
   | lapp (l_lam e) lab => Some (Ret ((subst_tm (scons lab var_label) var_tm e), memory, s))
   | unpack (pack v) e => if is_value_b v then Some (Ret (subst_tm var_label (scons v var_tm) e, memory, s)) else None
   | if_c c e1 e2 => if valid_constraint_b c then Some (Ret (e1, memory, s)) else Some (Ret (e2, memory, s))
-  | Op f es => 
-    match extract_arguments es with 
+  | Op f e1 e2 => 
+    match extract_argument e1 with 
     | None => None
-    | Some bs => Some (x <- f bs ;; Ret (bitstring x, memory, s)) end
+    | Some b1 => 
+      match extract_argument e2 with
+      | None => None
+      | Some b2 => Some (x <- (f b1 b2) ;; Ret (bitstring x, memory, s)) end end
   | _ => None
   end.
 
@@ -378,20 +366,12 @@ Proof.
   simpl. reflexivity.
 Qed.
 
+(* Unused... for now *)
 Definition is_value_dec {l m} (t : tm l m) : { is_value_b t = true } + { not (is_value_b t = true) }.
 Proof.
   destruct (is_value_b t) eqn:Hb.
   - left. reflexivity.
   - right. simpl. discriminate.
-Qed.
-
-Definition is_value_list {l m} (es : list (tm l m)) : Forall (fun v => is_value_b v = true) (fst (split_values es)).
-  Proof.
-    induction es.
-    - simpl. constructor.
-    - simpl. destruct (is_value_b a) eqn:Ha. 
-      + simpl. destruct (split_values es). simpl. simpl in IHes. constructor. assumption. assumption.
-      + simpl. constructor.
 Qed.
 
 Require Import Coq.Program.Equality.
@@ -487,20 +467,12 @@ Fixpoint decompose (e : tm 0 0) : option (Kctx * tm 0 0) :=
       | None => Some (KHole, sync e)
       | Some (K, r) => Some (KSync K, r)
       end
-  | Op f es =>
-    let fix scan f vs xs : option (Kctx * tm 0 0) :=
-        match xs with
-        | [] => Some (KHole, Op f vs)
-        | a :: xs' =>
-            if is_value_b a
-            then scan f (vs ++ [a]) xs'
-            else
-              match decompose a with
-              | Some (K, r) => Some (KOp f vs K xs', r)
-              | None => None
-              end
-        end
-    in scan f [] es
+  | Op f e1 e2 =>
+    match decompose e1, decompose e2 with 
+    | Some (K, r), _ => Some (KOpL f K e2, r)
+    | None, Some (K, r) => Some (KOpR f e1 K, r)
+    | _, _ => Some (KHole, Op f e1 e2)
+    end
   | _ => None
   end.
   
@@ -514,19 +486,18 @@ Proof.
   intros.
   dependent induction e; try (simpl; left; split; reflexivity; reflexivity).
   - destruct f.
-  - simpl. right. split. reflexivity. induction l.
-    + exists KHole, (Op o []). reflexivity.
-    + simpl. destruct (is_value_b a) eqn:Hb. simpl. admit. admit.
+  - simpl. right. split. reflexivity. destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
+    + destruct p. exists (KOpL o k e2), t. reflexivity.
+    + destruct p. exists (KOpL o k e2), t. reflexivity.
+    + destruct p. exists (KOpR o e1 k), t. reflexivity.
+    + exists (KHole), (Op o e1 e2). reflexivity.  
   - simpl. right. split. reflexivity. destruct (decompose e).
     + destruct p. exists (ZeroK k). exists t. reflexivity.
     + exists KHole. exists (zero e). simpl. reflexivity.
   - simpl. right. split. reflexivity. destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
     + destruct p. exists (KAppL k e2). exists t. reflexivity.
     + destruct p. exists (KAppL k e2). exists t. reflexivity.
-    + destruct p. specialize (IHe1 e1 eq_refl eq_refl). destruct IHe1.
-      * reflexivity.
-      * destruct H. exists (KAppR e1 k), t. reflexivity. 
-      * destruct H. exists (KAppR e1 k), t. reflexivity.  
+    + destruct p. exists (KAppR e1 k), t. reflexivity. 
     + exists KHole. exists (Core.app e1 e2). reflexivity.
   - simpl. right. split. reflexivity. destruct (decompose e).
     + destruct p. exists (KAlloc k). exists t. reflexivity.
@@ -609,11 +580,7 @@ Lemma eq_decompose : forall e K r,
 Proof.
   intros.
   dependent induction e; try inversion H; subst.
-  - induction l.
-    + inversion H1; subst. simpl. reflexivity.
-    + destruct (a :: l) eqn:He.
-      * inversion He.
-      * admit.  
+  - admit.
   - destruct (decompose e) eqn:He in H1. destruct p.
     + inversion H1; subst. specialize (IHe e eq_refl eq_refl).
       assert (e ~= e) as E. reflexivity.
@@ -720,36 +687,35 @@ Qed.
 
 Fixpoint Kcomp {l m} (K K0 : @Kctx l m) : @Kctx l m :=
   match K with
-  | KHole            => K0
-  | ZeroK   K'       => ZeroK   (Kcomp K' K0)
-  | KAppL   K' e2    => KAppL   (Kcomp K' K0) e2
-  | KAppR   v  K'    => KAppR   v  (Kcomp K' K0)
-  | KAlloc  K'       => KAlloc  (Kcomp K' K0)
-  | KDeAlloc K'      => KDeAlloc(Kcomp K' K0)
-  | KAssignL K' e2   => KAssignL (Kcomp K' K0) e2
-  | KAssignR v  K'   => KAssignR v  (Kcomp K' K0)
-  | KPairL  K' e2    => KPairL  (Kcomp K' K0) e2
-  | KPairR  v  K'    => KPairR  v  (Kcomp K' K0)
-  | KFst    K'       => KFst    (Kcomp K' K0)
-  | KSnd    K'       => KSnd    (Kcomp K' K0)
-  | KInl    K'       => KInl    (Kcomp K' K0)
-  | KInR    K'       => KInR    (Kcomp K' K0)
-  | KCase   K' e1 e2 => KCase   (Kcomp K' K0) e1 e2
-  | KTapp   K'       => KTapp   (Kcomp K' K0)
-  | KLapp   K' l     => KLapp   (Kcomp K' K0) l
-  | KPack   K'       => KPack   (Kcomp K' K0)
-  | KUnpack K' e     => KUnpack (Kcomp K' K0) e
-  | KIf     K' e1 e2 => KIf     (Kcomp K' K0) e1 e2
-  | KSync   K'       => KSync   (Kcomp K' K0)
-  | KOp f vs K' es   => KOp f vs (Kcomp K' K0) es
+  | KHole => K0
+  | ZeroK K' => ZeroK (Kcomp K' K0)
+  | KAppL K' e2 => KAppL (Kcomp K' K0) e2
+  | KAppR v  K' => KAppR v (Kcomp K' K0)
+  | KAlloc K' => KAlloc (Kcomp K' K0)
+  | KDeAlloc K' => KDeAlloc(Kcomp K' K0)
+  | KAssignL K' e2 => KAssignL (Kcomp K' K0) e2
+  | KAssignR v  K' => KAssignR v (Kcomp K' K0)
+  | KPairL K' e2 => KPairL (Kcomp K' K0) e2
+  | KPairR v  K' => KPairR v (Kcomp K' K0)
+  | KFst K' => KFst (Kcomp K' K0)
+  | KSnd K' => KSnd (Kcomp K' K0)
+  | KInl K' => KInl (Kcomp K' K0)
+  | KInR K' => KInR (Kcomp K' K0)
+  | KCase K' e1 e2 => KCase (Kcomp K' K0) e1 e2
+  | KTapp K' => KTapp (Kcomp K' K0)
+  | KLapp K' l => KLapp (Kcomp K' K0) l
+  | KPack K' => KPack (Kcomp K' K0)
+  | KUnpack K' e => KUnpack (Kcomp K' K0) e
+  | KIf K' e1 e2 => KIf (Kcomp K' K0) e1 e2
+  | KSync K' => KSync (Kcomp K' K0)
+  | KOpL f K' e2 => KOpL f (Kcomp K' K0) e2
+  | KOpR f v  K' => KOpR f v (Kcomp K' K0)
   end.
 
 Lemma Plug_comp {l m} (K K0 : @Kctx l m) e :
   Plug (Kcomp K K0) e = Plug K (Plug K0 e).
 Proof. 
-  induction K; simpl; f_equal; auto. 
-  rewrite IHK. 
-  reflexivity. 
+  induction K; simpl; f_equal; auto.
 Qed.
 
 Lemma wfKctx_comp {l m} (K K0 : @Kctx l m) :
@@ -772,8 +738,9 @@ Proof.
     destruct H1. rewrite H1 in H4. discriminate H4.
   - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
     destruct H1. rewrite H1 in H4. discriminate H4.
-  - admit. (* Op case, will be changed soon anyway*)
-Admitted.
+  - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
+    destruct H1. rewrite H1 in H5. discriminate H5.
+Qed.
 
 Lemma uniform_bind_assoc {A B C}
       d (k1 : A -> option (Dist B)) (k2 : B -> option (Dist C)) :
@@ -934,33 +901,21 @@ Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * me
 
 (* Sample Coin Flip Op *)
 Definition coin_flip : op :=
-  fun (x : list binary) =>
+  fun (x1 x2 : binary) =>
     b <- flip ;;
     ret (if b then bone bend else bzero bend).
 
-Definition first_binary (xs : list binary) : binary :=
-  match xs with
-  | x :: _ => x
-  | []     => bend
-  end.
-
-Definition second_binary (xs : list binary) : binary :=
-  match xs with
-  | _ :: y :: _ => y
-  | _           => bend
-  end.
-
 (* Sample Coin Flip Op *)
 Definition coin_flip_plus : op :=
-  fun (x : list binary) =>
+  fun (x1 x2 : binary) =>
     b <- flip ;;
-    ret (if b then (first_binary x) else (second_binary x)).
+    ret (if b then x1 else x2).
 
 Definition double_coin_flip : op :=
-  fun (x : list binary) =>
+  fun (x1 x2 : binary) =>
     a <- flip ;;
     b <- flip ;;
-    ret (if a then (first_binary x) else if b then (first_binary x) else bzero bend).
+    ret (if a then x1 else if b then x2 else bzero bend).
 
 (* Quick unfold *)
 Lemma tester :
@@ -976,9 +931,9 @@ Proof.
   unfold double_coin_flip. simpl. reflexivity.
 Qed.
 
-Definition coin_Op : tm 0 0 := (Op coin_flip []).
+Definition coin_Op : tm 0 0 := (Op coin_flip (bitstring bend) (bitstring bend)).
 
-Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus [(bitstring (bone (bone bend))) ; (bitstring (bone bend))]).
+Definition coin_Op_plus : tm 0 0 := (Op coin_flip_plus (bitstring (bone (bone bend)))  (bitstring (bone bend))).
 
 (* Test step/execute lemmas to see if we're in the correct place *)
 Lemma coin_test : forall memory s,

@@ -50,7 +50,7 @@ fixlam : (bind tm, tm in tm) -> tm
 tlam : tm -> tm
 l_lam : (bind label in tm) -> tm
 
-Op : op -> "list" (tm) -> tm
+Op : op -> tm -> tm -> tm
 
 zero : tm -> tm
 app : tm -> tm -> tm

@@ -5,6 +5,8 @@ Require Import Setoid Morphisms Relation_Definitions.
 
 Module Core.
 
+Definition Lcarrier := L.(labels).
+
 Inductive binary : Type :=
   | bzero : binary -> binary
   | bone : binary -> binary
@@ -76,8 +78,6 @@ Lemma congr_nlt : nlt = nlt.
 Proof.
 exact (eq_refl).
 Qed.
-
-Definition Lcarrier := L.(labels).
 
 Inductive label (n_label : nat) : Type :=
   | var_label : fin n_label -> label n_label
@@ -957,7 +957,7 @@ exact (fun s =>
        eq_ind_r (fun t => t = s) (instId'_constr s) (rinstInst'_constr id s)).
 Qed.
 
-Definition op := list binary -> Dist binary.
+Definition op := binary -> binary -> Dist binary.
 
 Inductive tm (n_label n_tm : nat) : Type :=
   | var_tm : fin n_tm -> tm n_label n_tm
@@ -968,7 +968,7 @@ Inductive tm (n_label n_tm : nat) : Type :=
   | fixlam : tm n_label (S (S n_tm)) -> tm n_label n_tm
   | tlam : tm n_label n_tm -> tm n_label n_tm
   | l_lam : tm (S n_label) n_tm -> tm n_label n_tm
-  | Op : op -> list (tm n_label n_tm) -> tm n_label n_tm
+  | Op : op -> tm n_label n_tm -> tm n_label n_tm -> tm n_label n_tm
   | zero : tm n_label n_tm -> tm n_label n_tm
   | app : tm n_label n_tm -> tm n_label n_tm -> tm n_label n_tm
   | alloc : tm n_label n_tm -> tm n_label n_tm
@@ -1037,12 +1037,16 @@ Proof.
 exact (eq_trans eq_refl (ap (fun x => l_lam m_label m_tm x) H0)).
 Qed.
 
-Lemma congr_Op {m_label m_tm : nat} {s0 : op} {s1 : list (tm m_label m_tm)}
-  {t0 : op} {t1 : list (tm m_label m_tm)} (H0 : s0 = t0) (H1 : s1 = t1) :
-  Op m_label m_tm s0 s1 = Op m_label m_tm t0 t1.
+Lemma congr_Op {m_label m_tm : nat} {s0 : op} {s1 : tm m_label m_tm}
+  {s2 : tm m_label m_tm} {t0 : op} {t1 : tm m_label m_tm}
+  {t2 : tm m_label m_tm} (H0 : s0 = t0) (H1 : s1 = t1) (H2 : s2 = t2) :
+  Op m_label m_tm s0 s1 s2 = Op m_label m_tm t0 t1 t2.
 Proof.
-exact (eq_trans (eq_trans eq_refl (ap (fun x => Op m_label m_tm x s1) H0))
-         (ap (fun x => Op m_label m_tm t0 x) H1)).
+exact (eq_trans
+         (eq_trans
+            (eq_trans eq_refl (ap (fun x => Op m_label m_tm x s1 s2) H0))
+            (ap (fun x => Op m_label m_tm t0 x s2) H1))
+         (ap (fun x => Op m_label m_tm t0 t1 x) H2)).
 Qed.
 
 Lemma congr_zero {m_label m_tm : nat} {s0 : tm m_label m_tm}
@@ -1253,7 +1257,9 @@ Fixpoint ren_tm {m_label m_tm : nat} {n_label n_tm : nat}
   | l_lam _ _ s0 =>
       l_lam n_label n_tm
         (ren_tm (upRen_label_label xi_label) (upRen_label_tm xi_tm) s0)
-  | Op _ _ s0 s1 => Op n_label n_tm s0 (list_map (ren_tm xi_label xi_tm) s1)
+  | Op _ _ s0 s1 s2 =>
+      Op n_label n_tm s0 (ren_tm xi_label xi_tm s1)
+        (ren_tm xi_label xi_tm s2)
   | zero _ _ s0 => zero n_label n_tm (ren_tm xi_label xi_tm s0)
   | app _ _ s0 s1 =>
       app n_label n_tm (ren_tm xi_label xi_tm s0) (ren_tm xi_label xi_tm s1)
@@ -1346,8 +1352,9 @@ tm n_label n_tm :=
   | l_lam _ _ s0 =>
       l_lam n_label n_tm
         (subst_tm (up_label_label sigma_label) (up_label_tm sigma_tm) s0)
-  | Op _ _ s0 s1 =>
-      Op n_label n_tm s0 (list_map (subst_tm sigma_label sigma_tm) s1)
+  | Op _ _ s0 s1 s2 =>
+      Op n_label n_tm s0 (subst_tm sigma_label sigma_tm s1)
+        (subst_tm sigma_label sigma_tm s2)
   | zero _ _ s0 => zero n_label n_tm (subst_tm sigma_label sigma_tm s0)
   | app _ _ s0 s1 =>
       app n_label n_tm (subst_tm sigma_label sigma_tm s0)
@@ -1462,9 +1469,10 @@ Fixpoint idSubst_tm {m_label m_tm : nat}
       congr_l_lam
         (idSubst_tm (up_label_label sigma_label) (up_label_tm sigma_tm)
            (upId_label_label _ Eq_label) (upId_label_tm _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_id (idSubst_tm sigma_label sigma_tm Eq_label Eq_tm) s1)
+        (idSubst_tm sigma_label sigma_tm Eq_label Eq_tm s1)
+        (idSubst_tm sigma_label sigma_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero (idSubst_tm sigma_label sigma_tm Eq_label Eq_tm s0)
   | app _ _ s0 s1 =>
@@ -1595,10 +1603,10 @@ ren_tm xi_label xi_tm s = ren_tm zeta_label zeta_tm s :=
            (upRen_label_label zeta_label) (upRen_label_tm zeta_tm)
            (upExtRen_label_label _ _ Eq_label) (upExtRen_label_tm _ _ Eq_tm)
            s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_ext
-           (extRen_tm xi_label xi_tm zeta_label zeta_tm Eq_label Eq_tm) s1)
+        (extRen_tm xi_label xi_tm zeta_label zeta_tm Eq_label Eq_tm s1)
+        (extRen_tm xi_label xi_tm zeta_label zeta_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (extRen_tm xi_label xi_tm zeta_label zeta_tm Eq_label Eq_tm s0)
@@ -1754,10 +1762,10 @@ subst_tm sigma_label sigma_tm s = subst_tm tau_label tau_tm s :=
         (ext_tm (up_label_label sigma_label) (up_label_tm sigma_tm)
            (up_label_label tau_label) (up_label_tm tau_tm)
            (upExt_label_label _ _ Eq_label) (upExt_label_tm _ _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_ext
-           (ext_tm sigma_label sigma_tm tau_label tau_tm Eq_label Eq_tm) s1)
+        (ext_tm sigma_label sigma_tm tau_label tau_tm Eq_label Eq_tm s1)
+        (ext_tm sigma_label sigma_tm tau_label tau_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (ext_tm sigma_label sigma_tm tau_label tau_tm Eq_label Eq_tm s0)
@@ -1921,12 +1929,12 @@ ren_tm rho_label rho_tm s :=
            (upRen_label_label zeta_label) (upRen_label_tm zeta_tm)
            (upRen_label_label rho_label) (upRen_label_tm rho_tm)
            (up_ren_ren _ _ _ Eq_label) Eq_tm s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_comp
-           (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
-              Eq_label Eq_tm)
-           s1)
+        (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
+           Eq_label Eq_tm s1)
+        (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
+           Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (compRenRen_tm xi_label xi_tm zeta_label zeta_tm rho_label rho_tm
@@ -2136,12 +2144,12 @@ subst_tm theta_label theta_tm s :=
            (up_label_label theta_label) (up_label_tm theta_tm)
            (up_ren_subst_label_label _ _ _ Eq_label)
            (up_ren_subst_label_tm _ _ _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_comp
-           (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label
-              theta_tm Eq_label Eq_tm)
-           s1)
+        (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label theta_tm
+           Eq_label Eq_tm s1)
+        (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label theta_tm
+           Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (compRenSubst_tm xi_label xi_tm tau_label tau_tm theta_label theta_tm
@@ -2433,12 +2441,12 @@ subst_tm theta_label theta_tm s :=
            (up_label_label theta_label) (up_label_tm theta_tm)
            (up_subst_ren_label_label _ _ _ Eq_label)
            (up_subst_ren_label_tm _ _ _ _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_comp
-           (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm
-              theta_label theta_tm Eq_label Eq_tm)
-           s1)
+        (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm theta_label
+           theta_tm Eq_label Eq_tm s1)
+        (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm theta_label
+           theta_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (compSubstRen_tm sigma_label sigma_tm zeta_label zeta_tm theta_label
@@ -2736,12 +2744,12 @@ subst_tm theta_label theta_tm s :=
            (up_label_tm tau_tm) (up_label_label theta_label)
            (up_label_tm theta_tm) (up_subst_subst_label_label _ _ _ Eq_label)
            (up_subst_subst_label_tm _ _ _ _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_comp
-           (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm
-              theta_label theta_tm Eq_label Eq_tm)
-           s1)
+        (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm theta_label
+           theta_tm Eq_label Eq_tm s1)
+        (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm theta_label
+           theta_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (compSubstSubst_tm sigma_label sigma_tm tau_label tau_tm theta_label
@@ -3045,11 +3053,10 @@ ren_tm xi_label xi_tm s = subst_tm sigma_label sigma_tm s :=
            (up_label_label sigma_label) (up_label_tm sigma_tm)
            (rinstInst_up_label_label _ _ Eq_label)
            (rinstInst_up_label_tm _ _ Eq_tm) s0)
-  | Op _ _ s0 s1 =>
+  | Op _ _ s0 s1 s2 =>
       congr_Op (eq_refl s0)
-        (list_ext
-           (rinst_inst_tm xi_label xi_tm sigma_label sigma_tm Eq_label Eq_tm)
-           s1)
+        (rinst_inst_tm xi_label xi_tm sigma_label sigma_tm Eq_label Eq_tm s1)
+        (rinst_inst_tm xi_label xi_tm sigma_label sigma_tm Eq_label Eq_tm s2)
   | zero _ _ s0 =>
       congr_zero
         (rinst_inst_tm xi_label xi_tm sigma_label sigma_tm Eq_label Eq_tm s0)
