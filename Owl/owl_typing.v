@@ -587,7 +587,7 @@ Proof.
       specialize (IHe E k r He). rewrite IHe. simpl. reflexivity.
     + inversion H1; subst. simpl. reflexivity.
   - destruct (decompose e1) eqn:He1; destruct (decompose e2) eqn:He2.
-    + inversion H1; subst.     
+    + destruct p. inversion H1; subst.      
 Admitted.
 
 (* Decompose Lemma 3 *)
@@ -889,12 +889,12 @@ Qed.
 
 (** TODO:
   - Move uniform_bind into Dist.v DONE
-  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) SORT OF Done
+  - Finish decompose, spec out Lemma 1 (Lemma 1 is correctness for decompose) SORT OF Done, just tedious
   - Encoding the adversary TBD, easy but I've got bigger fish to fry
   - Finish reduce; get rid of Inductive versions DONE
   - Do monotonicity lemma DONE
-  - Well-bracketed lemma TBD 
-  - Make Op binary TBD *)
+  - Well-bracketed lemma DONE 
+  - Make Op binary DONE *)
 
 Definition plug_dist (K : Kctx) (c : (tm 0 0 * mem 0 0 * binary)) : (tm 0 0 * mem 0 0 * binary) :=
   let '(e,m,s) := c in (Plug K e, m, s).
