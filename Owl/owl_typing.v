@@ -694,37 +694,16 @@ Lemma value_of_plug { l m : nat} :
 Proof.
   intros K e HK.
   revert e.
-  induction HK. 
-  - intros e Hv; simpl in Hv; try assumption.
-  - intros e Hv. simpl in Hv. try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. rewrite Hv. specialize (IHHK e').
+  induction HK; try intros e'' Hv; try simpl in Hv; try assumption; try inversion Hv.
+  - rewrite Hv. specialize (IHHK e'').
     destruct (andb_prop _ _ H0) as [HvK HvE]. specialize (IHHK HvK). apply IHHK.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. rewrite Hv. specialize (IHHK e').
+  - rewrite Hv. specialize (IHHK e'').
     destruct (andb_prop _ _ H1) as [HvK HvE]. specialize (IHHK HvE). apply IHHK.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv. 
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-    specialize (IHHK e' Hv). rewrite IHHK. rewrite Hv. reflexivity.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-    specialize (IHHK e' Hv). rewrite IHHK. rewrite Hv. reflexivity.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-    specialize (IHHK e' Hv). rewrite IHHK; rewrite Hv. reflexivity.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
-  - intros e' Hv; simpl in Hv; try assumption. inversion Hv.
+  - specialize (IHHK e'' Hv). rewrite IHHK. rewrite Hv. reflexivity.
+  - specialize (IHHK e'' Hv). rewrite IHHK. rewrite Hv. reflexivity.
+  - specialize (IHHK e'' Hv). rewrite IHHK; rewrite Hv. reflexivity.
 Qed.
 
-(* 5 Step plan *)
 Lemma wf_value_plug {l m}: forall K (e : tm l m),
   is_value_b (Plug K e) = true ->
   wfKctx K.
@@ -781,9 +760,19 @@ Proof.
 Qed.
 
 Lemma decompose_plug K e K0 r :
+  wfKctx K ->
   decompose e = Some (K0,r) ->
   decompose (Plug K e) = Some (Kcomp K K0, r).
 Proof.
+  intros.
+  induction K; try simpl; try inversion H; subst; try specialize (IHK H2); try rewrite IHK; try reflexivity; try assumption.   
+  - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
+    destruct H1. rewrite H1 in H4. discriminate H4.
+  - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
+    destruct H1. rewrite H1 in H4. discriminate H4.
+  - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
+    destruct H1. rewrite H1 in H4. discriminate H4.
+  - admit. (* Op case, will be changed soon anyway*)
 Admitted.
 
 Lemma uniform_bind_assoc {A B C}
@@ -800,16 +789,19 @@ Proof.
     simpl. rewrite Hf. rewrite Ht.
 Admitted.
 
+(* 5 Step plan *)
 Lemma well_bracketed : forall k K e memory s D,
+  wfKctx K -> (* This is needed since K may not always be well formed *)
   exec k (Plug K e) memory s = Some D ->
   (uniform_bind (exec k e memory s) (fun '(e', m', s') =>(exec k (Plug K e') m' s'))) = Some D.
 Proof.
-  induction k; intros.
+  induction k; intros K e memory s D H' H.
   (* k = 0 case *)
   specialize H as Hprime. 
   simpl in H.
   destruct (is_value_b (Plug K e)) eqn:Hp.
-  assert (Some (ret (Plug K e, memory, s)) = uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s'))))).
+  assert (Some (ret (Plug K e, memory, s)) = 
+          uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s'))))).
   simpl. reflexivity.
   assert (uniform_bind (Some (ret (e, memory, s))) (fun '(e', m', s') => (Some (ret (Plug K e', m', s')))) =
           uniform_bind (exec 0 e memory s) (fun '(e', m', s') => (exec 0 (Plug K e') m' s'))).
@@ -845,12 +837,13 @@ Proof.
     specialize (wf_value_plug K (Plug K0 r) Hy). intros.
     specialize (value_of_plug K (Plug K0 r) H2 Hy). intros.
     rewrite H3 in H0. inversion H0.
-    rewrite (decompose_plug K _ _ _ H1).
+
+    rewrite (decompose_plug K _ _ _ H' H1).
     f_equal.
     apply functional_extensionality. intros. 
     destruct x; simpl. fold exec. destruct p; simpl.
     rewrite Plug_comp. reflexivity.
-    (* step 2 -Inductive- *)
+    (* step 2 - Inductive - *)
     assert (uniform_bind (reduce r memory s) (fun '(e', m', s') => (exec k (Plug K (Plug K0 e')) m' s')) =
             uniform_bind (reduce r memory s) (fun '(e', m', s') => 
                                                     (uniform_bind (exec k (Plug K0 e') m' s') (fun '(e'', m'', s'') => (exec k (Plug K e'') m'' s''))))).
@@ -865,7 +858,7 @@ Proof.
     destruct (uniform_bind_all_some _ _ _ H3 _ Hin) as [Dleaf HK2x].
     specialize (IHk K (Plug K0 e') m' s' Dleaf). 
     simpl in HK2x. 
-    specialize (IHk HK2x). 
+    specialize (IHk H' HK2x). 
     rewrite <- IHk in HK2x. 
     apply HK2x. 
     (* step 3 *)    
@@ -917,7 +910,7 @@ Proof.
     specialize (exec_monotonicity k (S k) (Plug K t) m b x1 H8) as Hem.
     assert (S k >= k). lia. specialize (Hem H9). symmetry in Hem. apply Hem.
     specialize (H7 x H6). simpl in H7. simpl. apply H7.
-    (* Wrap up *)
+    (* Wrap up the chain via rewrites *)
     rewrite <- H.
     rewrite H2.
     rewrite H3.
@@ -925,7 +918,7 @@ Proof.
     rewrite H5.
     rewrite H6.
     reflexivity.
-Admitted.
+Qed.
 
 (** TODO:
   - Move uniform_bind into Dist.v DONE
