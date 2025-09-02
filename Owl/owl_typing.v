@@ -7,6 +7,9 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Setoid Morphisms Relation_Definitions.
 From Coq Require Import Arith.Arith.
 
+(* Some nice Ltac *)
+Ltac inv H := inversion H; subst.
+
 (* l for label variables in scope *)
 (* d for type variables in scope  *)
 (* m for term variables in scope  *)
@@ -535,8 +538,8 @@ Proof.
     specialize (IHe1 e1 eq_refl eq_refl H). specialize (IHe2 e2 eq_refl eq_refl H0).
     destruct IHe1; destruct IHe2.
     + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. left. split. reflexivity. 
-      destruct (decompose e1); destruct (decompose e2); try inversion H4.
-      * destruct p. inversion H3.
+      destruct (decompose e1); destruct (decompose e2); try inv H4.
+      * destruct p. inv H3.
       * reflexivity.
     + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
       destruct (decompose e1); destruct (decompose e2).
@@ -545,7 +548,7 @@ Proof.
       * destruct p. exists (KPairR e1 k), t. reflexivity.
       * assumption.
     + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
-      destruct (decompose e1); destruct (decompose e2); try inversion H4.
+      destruct (decompose e1); destruct (decompose e2); try inv H4.
       * destruct p. exists (KPairL k e2), t. reflexivity.
       * assumption.
     + destruct H1; destruct H2. repeat rewrite H1. repeat rewrite H2. simpl. right. split. reflexivity.
@@ -594,7 +597,7 @@ Lemma eq_decompose : forall e K r,
   e = (Plug K r).
 Proof.
   intros.
-  dependent induction e; try inversion H; subst.
+  dependent induction e; try inv H.
   - admit.
   - destruct (decompose e) eqn:He in H1. destruct p.
     + inversion H1; subst. specialize (IHe e eq_refl eq_refl).
@@ -611,13 +614,13 @@ Lemma wf_decompose : forall (e : tm 0 0) K r,
   wfKctx K.
 Proof.
   dependent induction e; intros K r H; simpl in H;
-  try (inversion H; subst; constructor; fail).
+  try (inv H; constructor; fail).
   - simpl in H. admit.
   - destruct (decompose e) eqn:Hd.
-    + destruct p. inversion H; subst. constructor. 
+    + destruct p. inv H. constructor. 
       assert (e ~= e) as E. reflexivity.
       specialize (IHe e eq_refl eq_refl E k r). apply IHe. apply Hd.
-    + inversion H; subst. constructor.
+    + inv H. constructor.
 Admitted.  
 
 Lemma exec_monotonicity : forall a k k' e memory s D,
@@ -628,7 +631,7 @@ Proof.
   intros.
   revert e memory s D k' H0 H.
   induction k.
-  - intros. inversion H; subst. destruct (is_value_b e) eqn:Hv.
+  - intros. inv H. destruct (is_value_b e) eqn:Hv.
     + rewrite <- H2 in H. unfold exec. inversion H0; subst.
       * reflexivity.
       * rewrite Hv. reflexivity.
@@ -636,11 +639,11 @@ Proof.
   - intros. specialize unique_decomposition as Hud.
     specialize (Hud e). destruct Hud.
     + destruct H1. unfold exec. destruct k'.
-      * rewrite H1. inversion H; subst. rewrite H1 in H4. reflexivity.
-      * rewrite H1. inversion H; subst. reflexivity.
+      * rewrite H1. inv H. rewrite H1 in H4. reflexivity.
+      * rewrite H1. inv H. reflexivity.
     + destruct H1. destruct H2. destruct H2. specialize (eq_decompose e x x0 H2) as Hd. specialize H as H'.
       rewrite Hd in H. unfold exec in H. destruct (is_value_b (Plug x x0)) eqn:Hv.
-      * inversion H; subst. rewrite H1 in Hv. inversion Hv. (* disproved *)
+      * inv H. rewrite H1 in Hv. inversion Hv. (* disproved *)
       * induction k'. inversion H0. destruct (decompose (Plug x x0)) eqn:HP.
         assert (Hkn : decompose (Plug x x0) = Some (x, x0)). {
           rewrite Hd in H2. apply H2.
@@ -746,7 +749,7 @@ Lemma decompose_plug K e K0 r :
   decompose (Plug K e) = Some (Kcomp K K0, r).
 Proof.
   intros.
-  induction K; try simpl; try inversion H; subst; try specialize (IHK H2); try rewrite IHK; try reflexivity; try assumption.   
+  induction K; try simpl; try inv H; try specialize (IHK H2); try rewrite IHK; try reflexivity; try assumption.   
   - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
     destruct H1. rewrite H1 in H4. discriminate H4.
   - specialize (IHK H3). specialize (unique_decomposition t) as Hu. destruct Hu. destruct H1. rewrite H2. reflexivity.
@@ -791,7 +794,7 @@ Proof.
   specialize (wf_value_plug K e Hp) as Hwfv.
   specialize (Hpl Hwfv Hp). rewrite Hpl. simpl. rewrite Hp. reflexivity.
   simpl in Hprime. rewrite Hp in Hprime. rewrite H0 in Hprime. rewrite H1 in Hprime. rewrite <- Hprime.
-  simpl. inversion H; subst. reflexivity. inversion H.
+  simpl. inv H. reflexivity. inv H.
   (* k + 1 case goes/starts here *)
   (* e is a value *)
   destruct (unique_decomposition e). destruct H0.
