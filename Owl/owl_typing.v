@@ -1150,9 +1150,9 @@ Inductive has_type {l d m : nat} (Phi : phi_context l) (Delta : delta_context l 
   has_type Phi (lift_delta (scons t0 Delta)) (lift_gamma Gamma) e t ->
   has_type Phi Delta Gamma (tlam e) (all t0 t)
 | T_EUniv : forall t t' t0 e,
- subtype Phi Delta t' t0 ->
- has_type Phi Delta Gamma e (all t0 t) ->
- has_type Phi Delta Gamma (tapp e) (subst_ty var_label (scons t' var_ty) t)
+  subtype Phi Delta t' t0 ->
+  has_type Phi Delta Gamma e (all t0 t) ->
+  has_type Phi Delta Gamma (tapp e) (subst_ty var_label (scons t' var_ty) t)
 | T_IExist : forall e t t' t0,
   has_type Phi Delta Gamma e (subst_ty var_label (scons t' var_ty) t) ->
   subtype Phi Delta t' t0 ->
