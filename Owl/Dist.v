@@ -1,6 +1,8 @@
 Require Import FunctionalExtensionality.
 Require Import QArith.
 Require Import List.
+Require Import Coq.Setoids.Setoid.
+Require Import Coq.Classes.Morphisms.
 
 Inductive Dist A :=
     | Ret : A -> Dist A
@@ -234,6 +236,20 @@ Proof.
     rewrite Ef1. rewrite Et1. reflexivity.
   - simpl. reflexivity.
 Qed.
+
+Definition Keq {A B} (d : option (Dist A)) 
+  (k1 k2 : A -> option (Dist B)) : Prop :=
+  forall x, inSupportUniform d x -> k1 x = k2 x.
+
+Add Parametric Morphism A B (d : option (Dist A))
+  : (@uniform_bind A B d) 
+  with signature Keq d ==> eq
+  as uniform_bind_mor.
+Proof.
+  intros k1 k2 Hk.
+  apply (uniform_bind_ext_on d k1 k2).
+  auto.
+Qed. 
 
 Lemma uniform_bind_all_some {A B} (c : option (Dist A)) (k : A -> option (Dist B)) d' :
   uniform_bind c k = Some d' ->
